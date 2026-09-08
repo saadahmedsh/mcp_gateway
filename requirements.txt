@@ -1,0 +1,14 @@
+mcp
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+redis
+httpx
+structlog
+opentelemetry-sdk
+opentelemetry-api
+opentelemetry-exporter-otlp
+docker
+tenacity
+pyyaml
