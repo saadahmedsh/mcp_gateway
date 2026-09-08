@@ -8,3 +8,36 @@ __pycache__/
 *.sqlite
 .env
 data/
+.coverage
+coverage.xml
+htmlcov/
+.idea/
+.vscode/
+
+
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+*.pyo
+*.pyd
+
+# Additional environment files containing secrets
+.env.*
+!.env.example
+
+# Additional database extensions
+*.sqlite3
+*.db-journal
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Test and coverage variants
+.coverage.*
+.tox/
+.nox/
+
+# Operating-system files
+.DS_Store
+Thumbs.db

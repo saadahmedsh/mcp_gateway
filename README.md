@@ -1,0 +1,201 @@
+# MCP Enterprise Agent Gateway
+
+A security and reliability control plane between LLM agents and the tools they
+invoke through the Model Context Protocol (MCP).
+
+> **Project status:** Phase 0 (environment and repository skeleton) is complete.
+> The MCP server, policy enforcement,
+> sandbox, repair loop, and audit chain are planned capabilities and are not yet
+> available. See [PLAN.md](PLAN.md) for the authoritative delivery plan.
+
+## Why this project exists
+
+Giving an AI agent direct access to a database, shell, or Git workspace creates a
+large trust gap. A model can generate malformed arguments, misunderstand intent,
+or be manipulated into attempting destructive operations. This gateway is
+designed to close that gap with three independent controls:
+
+1. **Deterministic policy enforcement** with OPA/Rego and explicit human approval
+   for sensitive operations.
+2. **Syscall-level execution isolation** through a gVisor or hardened-Docker
+   sandbox created for each tool call.
+3. **Bounded self-healing** that repairs malformed calls without retrying policy
+   denials or unsafe, potentially partial mutations.
+
+The policy layer—not the agent—is the authority. Every call is intended to be
+validated, traced, persisted, and written to a tamper-evident audit trail.
+
+## Target architecture
+
+```text
+Agent (MCP client)
+        │
+        ▼
+┌───────────────────────────────────────────────────────────┐
+│ Gateway (FastAPI + MCP server)                            │
+│                                                           │
+│  Registry/schema validation ──► OPA policy decision       │
+│                                      │                    │
+│                           requires approval               │
+│                                      ▼                    │
+│                              Redis HITL queue              │
+│                                                           │
+│  Repair loop ──► sandbox runner ──► tool execution        │
+│                                                           │
+│  Redis state │ OpenTelemetry traces │ hash-chained audit  │
+└───────────────────────────────────────────────────────────┘
+        │
+        ▼
+SQLite query runner │ shell executor │ Git workspace
+```
+
+## Delivery status
+
+| Phase | Capability | Status |
+|---:|---|---|
+| 0 | Environment and repository skeleton | Complete |
+| 1 | MCP server, registry, and database query tool | Planned |
+| 2 | Redis lifecycle state and OpenTelemetry tracing | Planned |
+| 3 | OPA policy enforcement and human approval | Planned |
+| 4 | gVisor and hardened-Docker execution | Planned |
+| 5 | Bounded repair and retry orchestration | Planned |
+| 6 | Hash-chained audit and evaluation harness | Planned |
+| 7 | Container packaging, Helm, and CI | Planned |
+
+Later-phase modules exist only as package boundaries. They intentionally contain
+no speculative implementation.
+
+## Phase 0 quick start
+
+### Prerequisites
+
+- Linux or WSL2 with native Docker Engine and the Compose plugin
+- Python 3.11 or newer
+- GNU Make and `curl`
+
+Docker Desktop is not required. Confirm that the current user can access the
+native Docker daemon:
+
+```bash
+docker run --rm hello-world
+```
+
+### Install the development environment
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install --requirement requirements.lock
+cp .env.example .env
+```
+
+All direct dependencies are version-pinned. `requirements.lock` captures the
+fully resolved environment used by the project.
+
+### Start and verify infrastructure
+
+```bash
+make up
+docker compose ps
+curl --fail http://localhost:8181/health
+make demo
+```
+
+Phase 0 starts the following local-only services:
+
+| Service | Purpose | Local endpoint |
+|---|---|---|
+| Redis | State and approval-queue foundation | `redis://localhost:6379/0` |
+| OPA | Deterministic policy engine | `http://localhost:8181` |
+| Jaeger | Trace collection and inspection | `http://localhost:16686` |
+| OTLP/gRPC | Trace ingestion | `http://localhost:4317` |
+
+Published ports bind to `127.0.0.1` and are not exposed to the local network by
+default.
+
+Stop the services without deleting Redis's named volume:
+
+```bash
+make down
+```
+
+## Development workflow
+
+```bash
+make lint       # Ruff, Black, and strict mypy
+make test       # pytest suite
+make eval       # phase-appropriate evaluation target
+```
+
+Install the Git hooks after creating the environment:
+
+```bash
+.venv/bin/pre-commit install
+.venv/bin/pre-commit run --all-files
+```
+
+Work proceeds one phase at a time. A phase cannot begin until the previous
+phase's acceptance criteria pass with real command output. Architectural choices
+that are not settled by the plan are recorded in
+[docs/DECISIONS.md](docs/DECISIONS.md).
+
+## Configuration
+
+Configuration is loaded by `gateway.config.Settings` from `GATEWAY_*`
+environment variables. `.env` is supported for local development and is ignored
+by Git; `.env.example` contains safe defaults.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `GATEWAY_ENVIRONMENT` | `development` | Runtime environment |
+| `GATEWAY_LOG_LEVEL` | `INFO` | Structured log threshold |
+| `GATEWAY_REDIS_URL` | `redis://localhost:6379/0` | Redis connection |
+| `GATEWAY_OPA_URL` | `http://localhost:8181` | OPA API |
+| `GATEWAY_OTLP_ENDPOINT` | `http://localhost:4317` | OTLP exporter target |
+| `GATEWAY_JAEGER_UI_URL` | `http://localhost:16686` | Jaeger UI |
+| `GATEWAY_APPROVAL_TIMEOUT_SECONDS` | `300` | Future HITL timeout |
+| `GATEWAY_SANDBOX_RUNTIME` | `hardened-docker` | Future sandbox runtime |
+| `GATEWAY_AUDIT_LOG_PATH` | `data/audit.jsonl` | Future audit destination |
+
+Never commit `.env`, credentials, tokens, private keys, or production data.
+
+## Repository structure
+
+```text
+gateway/       application packages and phase-owned boundaries
+eval/          evaluation harness and adversarial scenarios
+tests/         automated test suite
+docker/        gateway/tool images and seccomp policy boundaries
+docs/          decisions, threat model, and reproducible benchmarks
+```
+
+## Security model
+
+The final design assumes that agent input and tool arguments are untrusted. It
+will fail closed when policy evaluation is unavailable and will never rewrite a
+denied request to evade policy. Tool execution will receive restrictive resource,
+filesystem, capability, process, and network limits.
+
+Those are **target guarantees, not current Phase 0 guarantees**. The formal
+threat model and executable isolation tests arrive in Phase 4. Until then, do not
+connect this repository to untrusted agents or grant it access to production
+systems.
+
+## Scope
+
+The project intentionally supports only three deeply tested tool families:
+SQLite queries, shell execution, and Git workspaces. A web approval UI,
+multi-tenancy, RBAC, a custom policy language, and remote MCP proxying are outside
+the current scope.
+
+## Documentation
+
+- [PLAN.md](PLAN.md) — authoritative phase plan and acceptance criteria
+- [Architecture decisions](docs/DECISIONS.md) — accepted and rejected trade-offs
+- [Threat model](docs/THREAT_MODEL.md) — populated during Phase 4
+- [Benchmarks](docs/BENCHMARKS.md) — generated from the Phase 6 evaluation suite
+
+## License
+
+No license has been selected. Treat the source as all rights reserved until a
+license file is added.

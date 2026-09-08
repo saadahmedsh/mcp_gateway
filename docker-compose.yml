@@ -1,28 +1,63 @@
+name: mcp-gateway
+
 services:
   redis:
-    image: redis:7-alpine
-    ports: ["6379:6379"]
+    image: redis:7.4.2-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
-      retries: 5
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   opa:
-    image: openpolicyagent/opa:latest-rootless
-    ports: ["8181:8181"]
+    image: openpolicyagent/opa:1.0.0-static
     command:
-      - "run"
-      - "--server"
-      - "--addr=0.0.0.0:8181"
-      - "--log-level=debug"
-      - "/policies"
+      - run
+      - --server
+      - --addr=0.0.0.0:8181
+      - --log-level=info
+      - /policies
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8181:8181"
     volumes:
       - ./gateway/policy/policies:/policies:ro
+    healthcheck:
+      test: ["CMD", "/opa", "eval", "--data=/policies", "true"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
   jaeger:
-    image: jaegertracing/all-in-one:latest
+    image: jaegertracing/all-in-one:1.64.0
+    restart: unless-stopped
     ports:
-      - "16686:16686"
-      - "4317:4317"
+      - "127.0.0.1:16686:16686"
+      - "127.0.0.1:4317:4317"
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:14269/",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  redis-data:
