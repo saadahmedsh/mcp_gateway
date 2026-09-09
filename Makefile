@@ -24,6 +24,7 @@ demo:
 	curl --fail --silent --show-error http://localhost:8181/health
 	$(COMPOSE) exec --no-TTY redis redis-cli ping
 	curl --fail --silent --show-error --output /dev/null http://localhost:16686/
+	$(PYTHON) -m eval.client
 
 eval:
 	$(PYTHON) -m pytest tests

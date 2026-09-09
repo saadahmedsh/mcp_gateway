@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     opa_url: AnyHttpUrl = AnyHttpUrl("http://localhost:8181")
     otlp_endpoint: AnyHttpUrl = AnyHttpUrl("http://localhost:4317")
     jaeger_ui_url: AnyHttpUrl = AnyHttpUrl("http://localhost:16686")
+    database_path: Path = Path("data/gateway.sqlite")
     approval_timeout_seconds: int = 300
     sandbox_runtime: Literal["gvisor", "hardened-docker"] = "hardened-docker"
     audit_log_path: Path = Path("data/audit.jsonl")

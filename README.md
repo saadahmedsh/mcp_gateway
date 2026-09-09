@@ -3,10 +3,11 @@
 A security and reliability control plane between LLM agents and the tools they
 invoke through the Model Context Protocol (MCP).
 
-> **Project status:** Phase 0 (environment and repository skeleton) is complete.
-> The MCP server, policy enforcement,
-> sandbox, repair loop, and audit chain are planned capabilities and are not yet
-> available. See [PLAN.md](PLAN.md) for the authoritative delivery plan.
+> **Project status:** Phase 1 is complete. A real MCP client can discover the
+> gateway's tools and execute read-only queries against synthetic SQLite data.
+> Policy enforcement, sandboxing, tracing, repair, and the audit chain remain
+> planned capabilities. See [PLAN.md](PLAN.md) for the authoritative delivery
+> plan.
 
 ## Why this project exists
 
@@ -54,7 +55,7 @@ SQLite query runner │ shell executor │ Git workspace
 | Phase | Capability | Status |
 |---:|---|---|
 | 0 | Environment and repository skeleton | Complete |
-| 1 | MCP server, registry, and database query tool | Planned |
+| 1 | MCP server, registry, and database query tool | Complete |
 | 2 | Redis lifecycle state and OpenTelemetry tracing | Planned |
 | 3 | OPA policy enforcement and human approval | Planned |
 | 4 | gVisor and hardened-Docker execution | Planned |
@@ -62,10 +63,10 @@ SQLite query runner │ shell executor │ Git workspace
 | 6 | Hash-chained audit and evaluation harness | Planned |
 | 7 | Container packaging, Helm, and CI | Planned |
 
-Later-phase modules exist only as package boundaries. They intentionally contain
-no speculative implementation.
+Phase 2 and later modules exist only as package boundaries. They intentionally
+contain no speculative implementation.
 
-## Phase 0 quick start
+## Quick start
 
 ### Prerequisites
 
@@ -101,7 +102,7 @@ curl --fail http://localhost:8181/health
 make demo
 ```
 
-Phase 0 starts the following local-only services:
+The infrastructure command starts the following local-only services:
 
 | Service | Purpose | Local endpoint |
 |---|---|---|
@@ -112,6 +113,16 @@ Phase 0 starts the following local-only services:
 
 Published ports bind to `127.0.0.1` and are not exposed to the local network by
 default.
+
+`make demo` also starts a temporary stdio MCP server, discovers both registered
+tools, runs a parameterized `db_query`, and confirms that `shell_exec` refuses to
+run before Phase 4 sandboxing. The client emits one machine-readable JSON report.
+
+To run only the MCP demonstration:
+
+```bash
+.venv/bin/python -m eval.client
+```
 
 Stop the services without deleting Redis's named volume:
 
@@ -153,6 +164,7 @@ by Git; `.env.example` contains safe defaults.
 | `GATEWAY_OPA_URL` | `http://localhost:8181` | OPA API |
 | `GATEWAY_OTLP_ENDPOINT` | `http://localhost:4317` | OTLP exporter target |
 | `GATEWAY_JAEGER_UI_URL` | `http://localhost:16686` | Jaeger UI |
+| `GATEWAY_DATABASE_PATH` | `data/gateway.sqlite` | Synthetic SQLite database |
 | `GATEWAY_APPROVAL_TIMEOUT_SECONDS` | `300` | Future HITL timeout |
 | `GATEWAY_SANDBOX_RUNTIME` | `hardened-docker` | Future sandbox runtime |
 | `GATEWAY_AUDIT_LOG_PATH` | `data/audit.jsonl` | Future audit destination |
@@ -176,7 +188,8 @@ will fail closed when policy evaluation is unavailable and will never rewrite a
 denied request to evade policy. Tool execution will receive restrictive resource,
 filesystem, capability, process, and network limits.
 
-Those are **target guarantees, not current Phase 0 guarantees**. The formal
+Those are **target guarantees, not current Phase 1 guarantees**. Phase 1 only
+provides Pydantic validation and a physically read-only SQLite connection. The formal
 threat model and executable isolation tests arrive in Phase 4. Until then, do not
 connect this repository to untrusted agents or grant it access to production
 systems.

@@ -169,10 +169,10 @@ Tasks:
 - Write a minimal MCP client script in `eval/` that connects, lists tools, and calls `db_query`.
 
 Acceptance criteria:
-- [ ] Client lists both tools with correct JSON schemas derived from the Pydantic models.
-- [ ] `db_query` returns real rows from the seeded database.
-- [ ] Invalid arguments are rejected with a typed schema error, not a stack trace.
-- [ ] `shell_exec` returns a clear "not yet enabled" error.
+- [x] Client lists both tools with correct JSON schemas derived from the Pydantic models.
+- [x] `db_query` returns real rows from the seeded database.
+- [x] Invalid arguments are rejected with a typed schema error, not a stack trace.
+- [x] `shell_exec` returns a clear "not yet enabled" error.
 
 Anti-goals for this phase: no auth, no policy, no containers. Resist adding them early.
 

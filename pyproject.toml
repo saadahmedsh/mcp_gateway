@@ -8,7 +8,22 @@ target-version = "py311"
 exclude = [".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "ASYNC"]
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "ASYNC",
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D106",
+    "D107",
+]
 
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers"
