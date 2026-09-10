@@ -1,0 +1,51 @@
+replicaCount: 1
+
+image:
+  repository: mcp-gateway
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+gateway:
+  environment: production
+  redisUrl: redis://redis:6379/0
+  opaUrl: http://opa:8181
+  otlpEndpoint: http://jaeger-collector:4317
+  databasePath: /var/lib/mcp-gateway/gateway.sqlite
+  auditLogPath: /var/lib/mcp-gateway/audit.jsonl
+  sandboxRuntime: hardened-docker
+  sandboxImage: mcp-gateway-tool:local
+  repairEnabled: false
+  repairLlmUrl: http://repair-service/v1/chat/completions
+  repairLlmModel: repair-model
+  repairLlmApiKey: ""
+
+policyBundles:
+  tools.rego: |
+    package mcp_gateway
+
+    decision := {"outcome": "deny", "matched_rule": "bundle_not_configured", "reason": "Configure policyBundles.tools.rego"}
+
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault

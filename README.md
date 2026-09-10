@@ -193,6 +193,19 @@ Verify a generated audit chain with:
 .venv/bin/python -m gateway.audit.verify data/audit.jsonl
 ```
 
+Build the production image with:
+
+```bash
+docker build --file docker/Dockerfile.gateway --tag mcp-gateway:local .
+```
+
+Render and validate the Kubernetes chart with Helm:
+
+```bash
+helm lint deploy/helm/mcp-gateway
+helm template gateway deploy/helm/mcp-gateway
+```
+
 Install the Git hooks after creating the environment:
 
 ```bash
@@ -230,6 +243,27 @@ by Git; `.env.example` contains safe defaults.
 | `GATEWAY_AUDIT_LOG_PATH` | `data/audit.jsonl` | Future audit destination |
 
 Never commit `.env`, credentials, tokens, private keys, or production data.
+
+## Failure modes and planned improvements
+
+| Failure mode | Current behavior | Improvement |
+|---|---|---|
+| Redis unavailable | Bounded typed error; calls fail closed | Add replicated Redis and alerting |
+| OPA unavailable | Every live call is denied | Run HA OPA with versioned bundles |
+| Approval timeout | Call is denied and recorded | Add operator notifications and escalation |
+| Sandbox startup failure | Tool call fails; container cleanup is attempted | Add capacity checks and a quarantined worker pool |
+| Kubernetes sandbox runtime unavailable | Chart does not mount a host Docker socket | Deploy a dedicated sandbox worker service or Kubernetes-native runtime |
+| gVisor unsupported by host | Hardened Docker remains the fallback | Move gVisor to a Linux/Kubernetes worker pool |
+| LLM repair endpoint unavailable | Original failure is returned; no unsafe retry | Add a highly available repair service and circuit breaker |
+| LLM proposes unsafe arguments | Arguments are schema-validated and rechecked by OPA | Add signed model policies and an independent semantic validator |
+| Non-idempotent timeout | `needs_review`; no blind retry | Add tool-specific reconciliation and idempotency keys |
+| Audit disk full or unwritable | Audit write is logged as an operational error | Fail closed for compliance deployments and ship to immutable storage |
+| Stdio process crash | MCP connection terminates | Run supervised workers with restart and drain semantics |
+| Single-node audit file loss | Local evidence is unavailable | Replicate hash-chained records to WORM/object storage |
+
+The current deployment chart uses the stdio server with exec-based health
+probes. A network-facing MCP transport, external secret manager, HA Redis/OPA,
+and durable remote audit sink are deliberate follow-up improvements.
 
 ### Inspect Phase 2 state and traces
 

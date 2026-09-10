@@ -254,6 +254,29 @@ CLI has a portable `--runtime-flag` option.
 - **Rejected:** Making every evaluation depend on Docker and running services,
   because developer feedback and CI would become slow and fragile.
 
+## ADR-0025: Package the stdio gateway with exec health probes
+
+- **Status:** Accepted in Phase 7
+- **Decision:** The production image remains a non-root stdio MCP process. The
+  image healthcheck and Helm liveness/readiness probes validate configuration
+  with a short Python command rather than exposing an unauthenticated HTTP
+  endpoint.
+- **Reason:** The current MCP transport is stdio, so an HTTP probe would imply
+  a listener that does not exist and would expand the security surface.
+- **Rejected:** Adding an unauthenticated health HTTP server solely for probes;
+  a network transport will be introduced as a separate, authenticated design.
+
+## ADR-0026: Do not mount the host Docker socket in the Helm chart
+
+- **Status:** Accepted in Phase 7
+- **Decision:** The chart does not expose `/var/run/docker.sock` to the gateway.
+  Sandbox execution in Kubernetes requires a separately deployed worker or a
+  Kubernetes-native runtime integration.
+- **Reason:** The Docker socket is effectively host-root access and would
+  undermine the gateway's own isolation boundary.
+- **Rejected:** Mounting the socket for immediate feature parity, because it
+  creates a privilege-escalation path larger than the tool sandbox protects.
+
 ## ADR-0018: Keep repair policy separate from authorization policy
 
 - **Status:** Accepted in Phase 5
