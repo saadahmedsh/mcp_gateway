@@ -31,6 +31,7 @@ async def test_mcp_tools_end_to_end(tmp_path: Path) -> None:
             "GATEWAY_DATABASE_PATH": str(tmp_path / "gateway.sqlite"),
             "GATEWAY_STATE_STORE_BACKEND": "memory",
             "GATEWAY_ENVIRONMENT": "test",
+            "GATEWAY_REPAIR_ENABLED": "false",
         },
     )
 

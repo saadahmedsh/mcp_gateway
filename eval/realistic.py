@@ -14,8 +14,8 @@ from typing import Any
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from gateway.async_utils import run_blocking
 from eval.scenario_generator import generate_scenarios
+from gateway.async_utils import run_blocking
 from gateway.config import Settings
 
 

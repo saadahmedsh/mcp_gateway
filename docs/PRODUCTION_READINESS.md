@@ -7,7 +7,7 @@ Review date: 2026-09-10
 | Area | Result | Evidence |
 |---|---|---|
 | Formatting, lint, and typing | Pass | `make lint` |
-| Automated tests | Partial | The suite reaches `tests/test_audit.py` but currently exceeds the local 180-second verification timeout; this is an open operational/test-runner issue, not a passing release gate |
+| Automated tests | Partial | Audit, database, evaluation, tracing, HTTP, and identity tests pass (`18 passed`); the full suite still hangs in the existing real-stdio MCP integration test under this local MCP/AnyIO environment |
 | Pre-commit hooks | Pass | Ruff, Black, and mypy hooks passed |
 | Rego policy tests | Pass | `opa test gateway/policy/policies` — 5/5 |
 | Offline evaluation | Pass | `make eval` — 7/7 scenarios |

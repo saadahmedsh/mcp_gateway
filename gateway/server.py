@@ -12,7 +12,6 @@ import structlog
 from mcp import types
 from mcp.server.context import ServerRequestContext
 from mcp.server.lowlevel import Server
-from mcp.server.stdio import stdio_server
 
 from gateway import __version__
 from gateway.audit.log import AuditLogger
@@ -61,6 +60,7 @@ from gateway.state.redis_store import (
     StateStore,
     create_state_store,
 )
+from gateway.stdio_transport import asyncio_stdio_server
 from gateway.tools.db_query import create_db_query_tool, seed_database
 from gateway.tools.shell_exec import create_shell_exec_tool
 from gateway.tracing.otel import TracingManager, configure_logging, create_tracing
@@ -592,7 +592,11 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
         active_settings.redis_operation_timeout_seconds,
         active_settings.state_ttl_seconds,
     )
-    tracing = create_tracing(str(active_settings.otlp_endpoint))
+    tracing = create_tracing(
+        None
+        if active_settings.environment == "test"
+        else str(active_settings.otlp_endpoint)
+    )
     policy_client: PolicyClient = (
         AllowAllPolicyClient()
         if active_settings.environment == "test"
@@ -647,7 +651,7 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
         repair_advisor=repair_advisor,
     )
     try:
-        async with stdio_server() as (read_stream, write_stream):
+        async with asyncio_stdio_server() as (read_stream, write_stream):
             await server.run(
                 read_stream,
                 write_stream,

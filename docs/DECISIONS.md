@@ -347,3 +347,19 @@ CLI has a portable `--runtime-flag` option.
 - **Trade-off:** The local stack becomes heavier and requires more integration
   tests. The benefit is that Kind can exercise the same service boundaries and
   failure behavior expected in a real deployment.
+
+## ADR-0031: Use an explicit bounded executor bridge for synchronous I/O
+
+- **Status:** Accepted during Stage B verification
+- **Decision:** SQLite, audit-file, and evaluation-file operations use a shared
+  bounded `ThreadPoolExecutor`. The async wrapper polls the concurrent future
+  from the event loop instead of relying on `asyncio.to_thread()`'s default
+  executor callback.
+- **Reason:** On the supported local Python environment, default executor
+  callbacks did not wake the event loop reliably after filesystem or SQLite
+  operations, causing tests and local commands to hang. The explicit executor
+  preserves the non-blocking request boundary and makes worker capacity
+  visible and bounded.
+- **Rejected:** Performing filesystem or SQLite work directly in the event
+  loop, because it would violate the async request-path boundary. Increasing
+  test timeouts was also rejected because it would hide the stuck operation.

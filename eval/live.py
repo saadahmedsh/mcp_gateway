@@ -12,8 +12,8 @@ from typing import Any
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from gateway.async_utils import run_blocking
 from eval.harness import _load_scenarios
+from gateway.async_utils import run_blocking
 
 
 def _percentile(values: list[float], percentile: float) -> float:
