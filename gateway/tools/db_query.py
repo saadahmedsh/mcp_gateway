@@ -52,7 +52,11 @@ _WRITE_ACTIONS = frozenset(
 
 
 class DbQueryInput(StrictModel):
-    """Arguments accepted by the read-only database tool."""
+    """Query the synthetic ``orders`` table with safe parameters.
+
+    The table contains ``order_id``, ``customer_name``, ``customer_email``,
+    ``status``, and ``total_cents`` columns.
+    """
 
     query: str = Field(min_length=1, max_length=10_000)
     parameters: SqlParameters = Field(default_factory=dict)

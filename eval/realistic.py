@@ -15,6 +15,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from eval.scenario_generator import generate_scenarios
+from gateway.config import Settings
 
 
 def _percentile(values: list[float], percentile: float) -> float:
@@ -76,6 +77,7 @@ async def run_realistic_evaluation(
     """Execute generated scenarios against one live gateway process."""
 
     scenarios = generate_scenarios(seed, repetitions)
+    configured = Settings()
     with tempfile.TemporaryDirectory(prefix="mcp-realistic-") as directory:
         audit_path = Path(directory) / "audit.jsonl"
         environment = os.environ.copy()
@@ -85,8 +87,23 @@ async def run_realistic_evaluation(
                 "GATEWAY_STATE_STORE_BACKEND": "redis",
                 "GATEWAY_APPROVAL_TIMEOUT_SECONDS": "2",
                 "GATEWAY_AUDIT_LOG_PATH": str(audit_path),
+                "GATEWAY_REPAIR_ENABLED": str(configured.repair_enabled).lower(),
+                "GATEWAY_REPAIR_LLM_PROVIDER": configured.repair_llm_provider,
+                "GATEWAY_REPAIR_LLM_URL": str(configured.repair_llm_url),
+                "GATEWAY_REPAIR_LLM_MODEL": configured.repair_llm_model,
+                "GATEWAY_REPAIR_LLM_TIMEOUT_SECONDS": str(
+                    configured.repair_llm_timeout_seconds
+                ),
+                "GATEWAY_REPAIR_LLM_ANTHROPIC_VERSION": (
+                    configured.repair_llm_anthropic_version
+                ),
+                "GATEWAY_REPAIR_LLM_MAX_TOKENS": str(configured.repair_llm_max_tokens),
             }
         )
+        if configured.repair_llm_api_key is not None:
+            environment["GATEWAY_REPAIR_LLM_API_KEY"] = (
+                configured.repair_llm_api_key.get_secret_value()
+            )
         server = StdioServerParameters(
             command=sys.executable,
             args=["-m", "gateway.server"],
@@ -133,7 +150,9 @@ async def run_realistic_evaluation(
             "seed": seed,
             "repetitions": repetitions,
             "scenario_generation": "seeded_random_v1",
-            "repair_enabled": environment.get("GATEWAY_REPAIR_ENABLED", "false"),
+            "repair_enabled": configured.repair_enabled,
+            "repair_provider": configured.repair_llm_provider,
+            "repair_model": configured.repair_llm_model,
         },
         "metrics": {
             "scenario_count": len(results),

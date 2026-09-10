@@ -23,6 +23,21 @@ class RepairAdvisor(Protocol):
         """Return a replacement argument object for one diagnosed failure."""
 
 
+def _parse_arguments(content: Any) -> Mapping[str, Any]:
+    """Parse a model response that may contain a Markdown JSON code fence."""
+
+    if not isinstance(content, str):
+        raise ValueError("The repair model response must be text")
+    normalized = content.strip()
+    if normalized.startswith("```") and normalized.endswith("```"):
+        normalized = "\n".join(normalized.splitlines()[1:-1]).strip()
+    decoded = json.loads(normalized)
+    repaired = decoded.get("arguments") if isinstance(decoded, dict) else None
+    if not isinstance(repaired, dict):
+        raise ValueError("The repair model must return an arguments object")
+    return repaired
+
+
 class LLMRepairAdvisor:
     """Call an OpenAI-compatible chat-completions endpoint for repairs."""
 
@@ -76,8 +91,7 @@ class LLMRepairAdvisor:
                 response.raise_for_status()
                 payload = response.json()
             content = payload["choices"][0]["message"]["content"]
-            decoded = json.loads(content)
-            repaired = decoded.get("arguments") if isinstance(decoded, dict) else None
+            repaired = _parse_arguments(content)
         except (
             httpx.HTTPError,
             KeyError,
@@ -87,8 +101,6 @@ class LLMRepairAdvisor:
             json.JSONDecodeError,
         ) as error:
             raise ValueError("The repair model returned an invalid response") from error
-        if not isinstance(repaired, dict):
-            raise ValueError("The repair model must return an arguments object")
         if diagnosis.category is RepairFailure.POLICY_DENIED:
             raise ValueError("Policy denials cannot be repaired")
         return repaired
@@ -158,8 +170,7 @@ class AnthropicRepairAdvisor:
                 response.raise_for_status()
                 payload = response.json()
             content = payload["content"][0]["text"]
-            decoded = json.loads(content)
-            repaired = decoded.get("arguments") if isinstance(decoded, dict) else None
+            repaired = _parse_arguments(content)
         except (
             httpx.HTTPError,
             KeyError,
@@ -173,6 +184,4 @@ class AnthropicRepairAdvisor:
             ) from error
         if diagnosis.category is RepairFailure.POLICY_DENIED:
             raise ValueError("Policy denials cannot be repaired")
-        if not isinstance(repaired, dict):
-            raise ValueError("The repair model must return an arguments object")
         return repaired
