@@ -133,6 +133,7 @@ To approve a real pending call, use a second terminal while the gateway is
 waiting:
 
 ```bash
+.venv/bin/python -m gateway.hitl.cli list
 .venv/bin/python -m gateway.hitl.cli <approval-id> approve \
   --approver operator --reason "Verified maintenance request"
 ```

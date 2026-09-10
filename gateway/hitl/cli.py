@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import sys
 
 from gateway.config import get_settings
 from gateway.hitl.queue import RedisApprovalQueue
@@ -20,14 +21,28 @@ async def _run() -> None:
         for request in pending:
             print(
                 f"{request.approval_id} tool={request.tool_name} "
+                f"created_at={request.created_at.isoformat()} "
                 f"arguments={request.arguments} rule={request.matched_rule}"
             )
         parser = argparse.ArgumentParser()
-        parser.add_argument("approval_id")
-        parser.add_argument("decision", choices=("approve", "reject"))
-        parser.add_argument("--approver", required=True)
-        parser.add_argument("--reason", required=True)
+        parser.add_argument("approval_id", help="Approval ID or 'list'")
+        parser.add_argument("decision", choices=("approve", "reject"), nargs="?")
+        parser.add_argument("--approver")
+        parser.add_argument("--reason")
         args = parser.parse_args()
+        if args.approval_id == "list":
+            return
+        pending_ids = {request.approval_id for request in pending}
+        if args.approval_id not in pending_ids:
+            print(
+                f"Unknown or expired approval ID: {args.approval_id}",
+                file=sys.stderr,
+            )
+            return
+        if args.decision is None or args.approver is None or args.reason is None:
+            parser.error(
+                "decision, --approver, and --reason are required for approval changes"
+            )
         await queue.decide(
             args.approval_id,
             args.decision == "approve",
