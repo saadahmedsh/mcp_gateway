@@ -98,14 +98,14 @@ environment and is not present in this document or the JSON report.
 | Metric | Value |
 |---|---:|
 | scenario_count | 100 |
-| pass_rate | 0.87 |
+| pass_rate | 0.99 |
 | malformed_scenario_count | 40 |
-| malformed_repaired_count | 27 / 40 (67.5%) |
+| malformed_repaired_count | 39 / 40 (97.5%) |
 | policy_gate_accuracy_percent | 100.0 |
 | sandbox_escape_attempts_blocked | 20 / 20 |
-| latency_mean_ms | 2720.01 |
-| latency_p50_ms | 2043.86 |
-| latency_p95_ms | 5812.61 |
+| latency_mean_ms | 3157.58 |
+| latency_p50_ms | 2043.23 |
+| latency_p95_ms | 7761.01 |
 | mean_attempts_to_success | 1.0 |
 
 These values are a real local Redis/OPA/sandbox measurement from one host, not
@@ -125,7 +125,7 @@ only when repair is enabled.
 | Category | Ran | Passed | Failed | Pass meaning |
 |---|---:|---:|---:|---|
 | valid | 20 | 20 | 0 | Query executed successfully |
-| malformed | 40 | 27 | 13 | Arguments repaired and then executed |
+| malformed | 40 | 39 | 1 | Arguments repaired and then executed |
 | destructive | 20 | 20 | 0 | Destructive SQL was blocked |
 | adversarial | 20 | 20 | 0 | Host/network escape was blocked |
 

@@ -69,6 +69,13 @@ class LLMRepairAdvisor:
                 "tool arguments."
             ),
         }
+        if tool_name == "db_query":
+            prompt["tool_contract"] = (
+                "Query only the orders table. Its columns are order_id, "
+                "customer_name, customer_email, status, and total_cents. "
+                "max_rows limits returned rows and must not be used as a SQL "
+                "parameter."
+            )
         body = {
             "model": self._model,
             "temperature": 0,
@@ -147,6 +154,13 @@ class AnthropicRepairAdvisor:
                 "tool arguments. Do not change the requested operation."
             ),
         }
+        if tool_name == "db_query":
+            prompt["tool_contract"] = (
+                "Query only the orders table. Its columns are order_id, "
+                "customer_name, customer_email, status, and total_cents. "
+                "max_rows limits returned rows and must not be used as a SQL "
+                "parameter."
+            )
         body = {
             "model": self._model,
             "max_tokens": self._max_tokens,
