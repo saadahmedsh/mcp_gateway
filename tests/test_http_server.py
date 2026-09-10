@@ -34,7 +34,11 @@ async def test_health_endpoints_report_status(tmp_path: Path) -> None:
         assert (await client.get("/startupz")).json()["status"] == "ok"
         readiness = await client.get("/readyz")
         assert readiness.status_code == 200
-        assert readiness.json()["checks"] == {"state_store": True, "policy": True}
+        assert readiness.json()["checks"] == {
+            "state_store": True,
+            "policy": True,
+            "control_plane": True,
+        }
 
 
 @pytest.mark.asyncio

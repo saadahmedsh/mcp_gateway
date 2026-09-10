@@ -377,3 +377,22 @@ CLI has a portable `--runtime-flag` option.
 - **Rejected:** Increasing MCP request timeouts or suppressing the integration
   test, because that would hide a broken protocol boundary. Replacing stdio
   with HTTP was also rejected because stdio remains a supported local path.
+
+## ADR-0033: Use PostgreSQL for durable control-plane state
+
+- **Status:** Accepted during Stage C
+- **Decision:** Store tenants, principals, approvals, tool-call summaries,
+  attempts, idempotency keys, policy versions, and configuration in PostgreSQL
+  through SQLAlchemy's async engine. Manage schema changes with Alembic. Keep
+  Redis for short-lived state, locks, and approval waiting signals.
+- **Reason:** Control-plane records need transactions, constraints, durable
+  backups, and independent scaling. PostgreSQL provides those properties while
+  asyncpg preserves the gateway's asynchronous request boundary.
+- **Rejected:** Redis-only persistence, because TTL-oriented coordination data
+  is not an adequate system of record; a synchronous ORM, because it would add
+  blocking database work to async request paths; moving the example SQLite tool
+  into PostgreSQL, because its local read-only fixture is intentionally scoped
+  as a sandboxed tool demonstration.
+- **Trade-off:** A local deployment now has one additional service and a
+  migration release step. The benefit is explicit transactional ownership and
+  a path to managed PostgreSQL, HA, backups, and restore verification.

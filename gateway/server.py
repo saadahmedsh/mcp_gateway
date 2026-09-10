@@ -17,6 +17,7 @@ from gateway import __version__
 from gateway.audit.log import AuditLogger
 from gateway.auth import get_current_principal
 from gateway.config import Settings, get_settings
+from gateway.control_plane.repository import ControlPlaneRepository
 from gateway.errors import (
     ApprovalRejectedError,
     ApprovalTimeoutError,
@@ -135,6 +136,7 @@ async def execute_tool_call(
     sandbox_runtime: str = "unknown",
     repair_advisor: RepairAdvisor | None = None,
     principal: Principal | None = None,
+    control_plane: ControlPlaneRepository | None = None,
 ) -> types.CallToolResult:
     """Run one request through state persistence, tracing, and tool execution."""
 
@@ -185,6 +187,21 @@ async def execute_tool_call(
             await state_store.create_call(record)
         except StateStoreUnavailableError as error:
             return _tool_result(error.response.model_dump(mode="json"), is_error=True)
+        if control_plane is not None:
+            try:
+                if principal is not None:
+                    await control_plane.upsert_tenant(
+                        principal.tenant_id, principal.tenant_id
+                    )
+                    await control_plane.upsert_principal(principal)
+                await control_plane.upsert_tool_call(record)
+            except Exception:
+                return _tool_result(
+                    ToolExecutionError(
+                        "Durable control-plane persistence is unavailable"
+                    ).response.model_dump(mode="json"),
+                    is_error=True,
+                )
 
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(
@@ -213,6 +230,14 @@ async def execute_tool_call(
                 current = await state_store.get_call(call_id)
                 if current is not None:
                     attempts = current.attempts
+                    if control_plane is not None:
+                        try:
+                            await control_plane.upsert_tool_call(current)
+                        except Exception as persistence_error:
+                            logger.warning(
+                                "control_plane_write_failed",
+                                error=str(persistence_error),
+                            )
             except StateStoreUnavailableError:
                 logger.warning("audit_state_unavailable")
             try:
@@ -359,6 +384,11 @@ async def execute_tool_call(
                         call_id, ToolCallState.AWAITING_APPROVAL
                     )
                     await approval_queue.submit(approval)
+                    if control_plane is not None:
+                        await control_plane.create_approval(
+                            approval,
+                            tenant_id=principal.tenant_id if principal else None,
+                        )
                     try:
                         resolved = await approval_queue.wait(
                             approval.approval_id, approval_timeout_seconds
@@ -375,6 +405,14 @@ async def execute_tool_call(
                         "approver", resolved.approver or "unknown"
                     )
                     approver_identity = resolved.approver
+                    if control_plane is not None:
+                        await control_plane.resolve_approval(
+                            approval.approval_id,
+                            resolved.decision or "approved",
+                            resolved.approver or "unknown",
+                            resolved.reason or "",
+                            datetime.now(UTC),
+                        )
                 elif decision.outcome != ALLOW:
                     await state_store.transition(
                         call_id, ToolCallState.DENIED, error=decision.reason
@@ -532,6 +570,7 @@ def create_mcp_server(
     sandbox_runtime: str = "unknown",
     repair_advisor: RepairAdvisor | None = None,
     principal: Principal | None = None,
+    control_plane: ControlPlaneRepository | None = None,
 ) -> Server[dict[str, Any]]:
     """Create the official MCP protocol adapter around the gateway runtime."""
 
@@ -569,6 +608,7 @@ def create_mcp_server(
             sandbox_runtime,
             repair_advisor,
             get_current_principal() or principal,
+            control_plane,
         )
 
     return Server(
@@ -605,6 +645,16 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
     approval_queue = RedisApprovalQueue(
         str(active_settings.redis_url),
         ttl_seconds=active_settings.state_ttl_seconds,
+    )
+    control_plane = (
+        ControlPlaneRepository(
+            str(active_settings.control_plane_database_url),
+            pool_size=active_settings.control_plane_pool_size,
+            max_overflow=active_settings.control_plane_max_overflow,
+            connect_timeout_seconds=active_settings.control_plane_connect_timeout_seconds,
+        )
+        if active_settings.control_plane_enabled
+        else None
     )
     audit_logger = AuditLogger(active_settings.audit_log_path)
     repair_advisor: RepairAdvisor | None = None
@@ -649,6 +699,7 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
         audit_logger=audit_logger,
         sandbox_runtime=active_settings.sandbox_runtime,
         repair_advisor=repair_advisor,
+        control_plane=control_plane,
     )
     try:
         async with asyncio_stdio_server() as (read_stream, write_stream):
@@ -660,6 +711,8 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
     finally:
         await state_store.close()
         await approval_queue.close()
+        if control_plane is not None:
+            await control_plane.close()
         tracing.force_flush()
         tracing.shutdown()
 

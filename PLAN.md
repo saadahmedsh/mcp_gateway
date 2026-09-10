@@ -371,16 +371,26 @@ policy, approval, repair, audit, or sandbox boundaries.
 
 The current foundation provides RS256 JWT verification against a configured
 JWKS endpoint, static-token compatibility for local staging, request-scoped
-principals, and identity-aware OPA inputs. PostgreSQL-backed identity records,
-tenant administration, and cross-tenant data enforcement remain Stage C work.
+principals, and identity-aware OPA inputs. PostgreSQL-backed identity records
+and durable tenant-owned control-plane records are implemented in Stage C;
+tenant administration APIs and full cross-tenant resource enforcement remain
+deployment hardening work.
 
-#### Stage C — Durable control-plane persistence
+#### Stage C — Durable control-plane persistence (implemented foundation)
 
 - Add PostgreSQL with SQLAlchemy/asyncpg and Alembic migrations.
 - Persist tenants, principals, approvals, tool calls, attempts, idempotency
   keys, policy versions, and configuration in PostgreSQL.
 - Retain Redis only for short-lived coordination, locks, and waiting signals.
 - Add transaction, backup, restore, and migration verification tests.
+
+The repository now includes typed SQLAlchemy async models and repository methods,
+an Alembic `0001_control_plane` migration, a local PostgreSQL Compose service,
+and optional runtime persistence controlled by
+`GATEWAY_CONTROL_PLANE_ENABLED`. PostgreSQL integration tests run when
+`GATEWAY_CONTROL_PLANE_TEST_DATABASE_URL` is configured; metadata and migration
+checks remain runnable without a database. Backups, restore drills, HA, and
+remote PostgreSQL operations remain Stage F deployment work.
 
 #### Stage D — Dedicated execution workers
 

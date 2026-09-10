@@ -15,4 +15,3 @@ pyyaml==6.0.3
 SQLAlchemy==2.0.45
 alembic==1.17.2
 asyncpg==0.30.0
-aiosqlite==0.21.0

@@ -19,6 +19,7 @@ from gateway.auth import (
     set_current_principal,
 )
 from gateway.config import Settings, get_settings
+from gateway.control_plane.repository import ControlPlaneRepository
 from gateway.errors import AuthenticationError
 from gateway.hitl.queue import RedisApprovalQueue
 from gateway.policy.client import AllowAllPolicyClient, OpaPolicyClient, PolicyClient
@@ -137,6 +138,16 @@ def create_http_app(settings: Settings | None = None) -> ASGIApp:
         str(active_settings.redis_url),
         ttl_seconds=active_settings.state_ttl_seconds,
     )
+    control_plane = (
+        ControlPlaneRepository(
+            str(active_settings.control_plane_database_url),
+            pool_size=active_settings.control_plane_pool_size,
+            max_overflow=active_settings.control_plane_max_overflow,
+            connect_timeout_seconds=active_settings.control_plane_connect_timeout_seconds,
+        )
+        if active_settings.control_plane_enabled
+        else None
+    )
     audit_logger = AuditLogger(active_settings.audit_log_path)
     repair_advisor: RepairAdvisor | None = None
     if (
@@ -177,6 +188,7 @@ def create_http_app(settings: Settings | None = None) -> ASGIApp:
         audit_logger=audit_logger,
         sandbox_runtime=active_settings.sandbox_runtime,
         repair_advisor=repair_advisor,
+        control_plane=control_plane,
     )
 
     async def livez(_request: Any) -> Response:
@@ -194,6 +206,11 @@ def create_http_app(settings: Settings | None = None) -> ASGIApp:
 
         state_healthcheck = getattr(state_store, "healthcheck", None)
         policy_healthcheck = getattr(policy_client, "healthcheck", None)
+        control_plane_healthcheck = (
+            getattr(control_plane, "healthcheck", None)
+            if control_plane is not None
+            else None
+        )
         checks = {
             "state_store": (
                 bool(await state_healthcheck()) if callable(state_healthcheck) else True
@@ -201,6 +218,11 @@ def create_http_app(settings: Settings | None = None) -> ASGIApp:
             "policy": (
                 bool(await policy_healthcheck())
                 if callable(policy_healthcheck)
+                else True
+            ),
+            "control_plane": (
+                bool(await control_plane_healthcheck())
+                if callable(control_plane_healthcheck)
                 else True
             ),
         }
@@ -230,6 +252,8 @@ def create_http_app(settings: Settings | None = None) -> ASGIApp:
         finally:
             await state_store.close()
             await approval_queue.close()
+            if control_plane is not None:
+                await control_plane.close()
             tracing.force_flush()
             tracing.shutdown()
 

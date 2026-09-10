@@ -60,7 +60,7 @@ def test_settings_have_safe_local_defaults(
     assert str(settings.opa_url) == "http://localhost:8181/"
     assert settings.database_path == Path("data/gateway.sqlite")
     assert settings.control_plane_enabled is False
-    assert settings.control_plane_database_url.startswith("postgresql+asyncpg://")
+    assert str(settings.control_plane_database_url).startswith("postgresql+asyncpg://")
     assert settings.sandbox_runtime == "hardened-docker"
     assert settings.audit_log_path == Path("data/audit.jsonl")
     assert settings.http_host == "0.0.0.0"

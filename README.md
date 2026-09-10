@@ -69,9 +69,10 @@ SQLite query runner │ shell executor │ Git workspace
 | 6 | Hash-chained audit and evaluation harness | Implemented |
 | 7 | Container packaging, Helm, and CI | Implemented |
 | 8 | Production hardening and Kind deployment | Implemented with local limits |
-| A | Documentation and scope expansion | In progress |
+| A | Documentation and scope expansion | Complete |
 | B | JWT/OIDC foundation, RBAC vocabulary, tenant-aware policy context | Implemented foundation |
-| C–F | PostgreSQL, workers, evaluation gates, production integrations | Planned |
+| C | PostgreSQL control-plane persistence and migrations | Implemented foundation |
+| D–F | Workers, evaluation gates, production integrations | Planned |
 
 Phase 2 records each call as `received`, `validated`, `policy_checked`,
 `executing`, and a terminal state. It creates a root `tool_call` span plus
@@ -138,15 +139,16 @@ require a real production platform.
    queue.
 4. The repair advisor may propose corrected arguments only for repairable
    failures. The gateway validates and re-evaluates policy before every retry.
-5. An authorized request is submitted to a dedicated sandbox worker with an
-   idempotency key and bounded resources.
+5. An authorized request is submitted to the configured sandbox runner with
+   bounded resources; the dedicated worker protocol is the next stage.
 6. State transitions, traces, approval evidence, attempts, and the outcome are
    persisted. The audit record is hash-chained and replicated in compliance
    mode.
 
-The complete deployment roadmap is in [PLAN.md](PLAN.md), beginning with
-Stage A (scope and documentation), followed by identity/RBAC, PostgreSQL,
-sandbox workers, evaluation gates, and production service integrations.
+The complete deployment roadmap is in [PLAN.md](PLAN.md), with documentation
+and identity foundations complete, PostgreSQL persistence implemented as a
+foundation, and sandbox workers, evaluation gates, and production service
+integrations remaining.
 
 ## Quick start
 
@@ -189,6 +191,7 @@ The infrastructure command starts the following local-only services:
 | Service | Purpose | Local endpoint |
 |---|---|---|
 | Redis | State and approval-queue foundation | `redis://localhost:6379/0` |
+| PostgreSQL | Durable control-plane records | `postgresql://localhost:5432/gateway` |
 | OPA | Deterministic policy engine | `http://localhost:8181` |
 | Jaeger | Trace collection and inspection | `http://localhost:16686` |
 | OTLP/gRPC | Trace ingestion | `http://localhost:4317` |
@@ -245,6 +248,20 @@ make up
 .venv/bin/python -m eval.realistic --seed 20260910 --repetitions 20
 jq '.metrics' eval/realistic-results.json
 ```
+
+The Compose stack includes PostgreSQL for the durable control plane. Apply its
+schema explicitly before enabling runtime persistence:
+
+```bash
+make up
+make db-migrate
+GATEWAY_CONTROL_PLANE_ENABLED=true make demo
+```
+
+The default local profile leaves durable persistence disabled so the fast demo
+can run with only the existing Redis state path. Production and staging
+profiles should enable it and run migrations as a release step, never on every
+application start.
 
 To measure model-guided repair, set `GATEWAY_REPAIR_ENABLED=true` and provide
 the OpenAI-compatible endpoint, model, and API key through the ignored `.env`
@@ -320,6 +337,11 @@ by Git; `.env.example` contains safe defaults.
 | `GATEWAY_OTLP_ENDPOINT` | `http://localhost:4317` | OTLP exporter target |
 | `GATEWAY_JAEGER_UI_URL` | `http://localhost:16686` | Jaeger UI |
 | `GATEWAY_DATABASE_PATH` | `data/gateway.sqlite` | Synthetic SQLite database |
+| `GATEWAY_CONTROL_PLANE_ENABLED` | `false` | Enable PostgreSQL control-plane persistence |
+| `GATEWAY_CONTROL_PLANE_DATABASE_URL` | `postgresql+asyncpg://gateway:gateway_local@localhost:5432/gateway` | Async PostgreSQL URL |
+| `GATEWAY_CONTROL_PLANE_POOL_SIZE` | `5` | PostgreSQL connection pool size |
+| `GATEWAY_CONTROL_PLANE_MAX_OVERFLOW` | `10` | Additional PostgreSQL connections |
+| `GATEWAY_CONTROL_PLANE_CONNECT_TIMEOUT_SECONDS` | `3.0` | PostgreSQL connection timeout |
 | `GATEWAY_APPROVAL_TIMEOUT_SECONDS` | `300` | Human approval timeout |
 | `GATEWAY_REPAIR_ENABLED` | `false` | Enable model-guided repair |
 | `GATEWAY_REPAIR_LLM_PROVIDER` | `openai_compatible` | Repair provider |
@@ -365,6 +387,7 @@ override those values through tool arguments.
 |---|---|---|
 | Redis unavailable | Bounded typed error; calls fail closed | Add replicated Redis and alerting |
 | OPA unavailable | Every live call is denied | Run HA OPA with versioned bundles |
+| PostgreSQL unavailable | Durable persistence fails closed when enabled | Use HA PostgreSQL, encrypted connections, and restore-tested backups |
 | Approval timeout | Call is denied and recorded | Add operator notifications and escalation |
 | Sandbox startup failure | Tool call fails; container cleanup is attempted | Add capacity checks and a quarantined worker pool |
 | Kubernetes sandbox runtime unavailable | Chart does not mount a host Docker socket | Deploy a dedicated sandbox worker service or Kubernetes-native runtime |
@@ -378,9 +401,9 @@ override those values through tool arguments.
 
 The local deployment supports stdio and the authenticated Streamable HTTP
 entrypoint. The current chart is suitable for Kind and staging experiments.
-OIDC/RBAC, tenant-aware authorization, PostgreSQL control-plane persistence,
-dedicated sandbox workers, HA Redis/OPA, external secret management, and a
-durable remote audit sink are the next deployment-ready stages.
+OIDC/RBAC and the PostgreSQL persistence foundation are implemented; dedicated
+sandbox workers, HA Redis/OPA, external secret management, and a durable remote
+audit sink remain the next deployment-ready stages.
 
 See the full release gate and evidence in
 [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md).

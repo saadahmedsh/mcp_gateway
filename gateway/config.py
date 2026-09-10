@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import AliasChoices, AnyHttpUrl, Field, RedisDsn, SecretStr
+from pydantic import AliasChoices, AnyHttpUrl, Field, PostgresDsn, RedisDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     jaeger_ui_url: AnyHttpUrl = AnyHttpUrl("http://localhost:16686")
     database_path: Path = Path("data/gateway.sqlite")
     control_plane_enabled: bool = False
-    control_plane_database_url: str = (
+    control_plane_database_url: PostgresDsn = PostgresDsn(
         "postgresql+asyncpg://gateway:gateway_local@localhost:5432/gateway"
     )
     control_plane_pool_size: int = 5

@@ -1,5 +1,7 @@
 annotated-doc==0.0.5
 annotated-types==0.8.0
+alembic==1.17.2
+asyncpg==0.30.0
 anyio==4.15.1
 ast_serialize==0.10.0
 attrs==26.1.0
@@ -15,6 +17,7 @@ distlib==0.4.3
 docker==7.2.0
 fastapi==0.141.1
 filelock==3.32.5
+greenlet==3.5.5
 googleapis-common-protos==1.75.3
 grpcio==1.83.1
 h11==0.16.0
@@ -29,6 +32,8 @@ iniconfig==2.3.0
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 librt==0.15.0
+Mako==1.4.1
+MarkupSafe==3.0.3
 mcp==2.2.0
 mcp-types==2.2.0
 mypy==2.3.1
@@ -67,6 +72,7 @@ referencing==0.37.0
 requests==2.34.2
 rpds-py==2026.6.3
 ruff==0.16.6
+SQLAlchemy==2.0.45
 sse-starlette==3.4.11
 starlette==1.6.0
 structlog==26.1.0

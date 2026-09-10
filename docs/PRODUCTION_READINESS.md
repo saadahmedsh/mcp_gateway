@@ -7,9 +7,9 @@ Review date: 2026-09-10
 | Area | Result | Evidence |
 |---|---|---|
 | Formatting, lint, and typing | Pass | `make lint` |
-| Automated tests | Pass | `make test` — 39 passed in 3.05s |
+| Automated tests | Pass | `make test` — 40 passed, 3 skipped in 3.42s; PostgreSQL integration is opt-in |
 | Pre-commit hooks | Pass | Ruff, Black, and mypy hooks passed |
-| Rego policy tests | Pass | `opa test gateway/policy/policies` — 5/5 |
+| Rego policy tests | Pass | `opa test gateway/policy/policies` — 9/9 |
 | Offline evaluation | Pass | `make eval` — 7/7 scenarios |
 | Live MCP evaluation | Pass | `make eval-live` — 7/7 scenarios |
 | Generated realistic benchmark | Pass | `eval.realistic` — seeded 10-scenario local run |
@@ -35,10 +35,9 @@ These items should be resolved before production traffic is permitted:
 5. The chart's policy ConfigMap is not an OPA deployment. Operators must deploy
    OPA with the same bundle or add an OPA sidecar before relying on the chart's
    `policyBundles` values.
-6. Identity, RBAC, tenant context, and PostgreSQL control-plane persistence are
-   not yet part of the gateway runtime. The current bearer token and Redis
-   lifecycle records are staging controls, not a multi-tenant authorization or
-   durable control-plane design.
+6. PostgreSQL control-plane persistence is implemented as an optional runtime
+   boundary with Alembic migrations. Production still requires HA PostgreSQL,
+   encrypted connections, backup/restore drills, and migration verification.
 
 ## High-priority hardening
 
@@ -58,8 +57,9 @@ These items should be resolved before production traffic is permitted:
   networking assumptions.
 - Add OIDC/JWT validation with JWKS rotation, role and tenant claims, and
   identity-aware OPA inputs.
-- Add PostgreSQL migrations, transaction boundaries, backups, and restore tests
-  for durable control-plane records while retaining Redis for coordination.
+- Run PostgreSQL migrations, transaction tests, backup/restore drills, and
+  disaster-recovery verification for durable control-plane records while
+  retaining Redis for coordination.
 - Add a dedicated authenticated sandbox-worker service with idempotency,
   reconciliation, bounded concurrency, and crash recovery.
 - Make policy bundles versioned, signed, loaded by OPA, and auditable.
