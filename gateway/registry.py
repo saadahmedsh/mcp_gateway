@@ -23,6 +23,7 @@ class ToolDefinition(Generic[InputModelT, OutputModelT]):
     input_model: type[InputModelT]
     output_model: type[OutputModelT]
     handler: Callable[[InputModelT], Awaitable[OutputModelT]]
+    idempotent: bool = False
 
     @property
     def input_schema(self) -> dict[str, Any]:

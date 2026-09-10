@@ -9,6 +9,7 @@ __pycache__/
 .env
 data/
 eval/results.json
+eval/live-results.json
 .coverage
 coverage.xml
 htmlcov/

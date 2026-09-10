@@ -21,6 +21,8 @@ class RepairContext:
 
     risk_class: RiskClass
     idempotent: bool = False
+    tool_name: str = "unknown"
+    tool_schema: Mapping[str, Any] | None = None
 
 
 Repairer = Callable[[Mapping[str, Any], FailureDiagnosis], Awaitable[Mapping[str, Any]]]

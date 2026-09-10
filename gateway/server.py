@@ -32,6 +32,7 @@ from gateway.hitl.queue import (
 )
 from gateway.models import (
     AttemptRecord,
+    RepairFailure,
     RiskClass,
     StateTransition,
     ToolCallRecord,
@@ -44,6 +45,8 @@ from gateway.policy.client import (
 )
 from gateway.policy.decisions import ALLOW, REQUIRES_APPROVAL
 from gateway.registry import ToolDefinition, ToolRegistry
+from gateway.repair.advisor import LLMRepairAdvisor, RepairAdvisor
+from gateway.repair.diagnose import FailureDiagnosis, diagnose
 from gateway.repair.loop import RepairContext, RepairLoop
 from gateway.sandbox.runner import SandboxRunner
 from gateway.state.redis_store import (
@@ -77,7 +80,7 @@ def _annotations_for(
         return types.ToolAnnotations(
             read_only_hint=True,
             destructive_hint=False,
-            idempotent_hint=True,
+            idempotent_hint=definition.idempotent,
             open_world_hint=False,
         )
     return types.ToolAnnotations(
@@ -123,6 +126,7 @@ async def execute_tool_call(
     approval_timeout_seconds: float = 300.0,
     audit_logger: AuditLogger | None = None,
     sandbox_runtime: str = "unknown",
+    repair_advisor: RepairAdvisor | None = None,
 ) -> types.CallToolResult:
     """Run one request through state persistence, tracing, and tool execution."""
 
@@ -244,11 +248,32 @@ async def execute_tool_call(
             return _tool_result(error.response.model_dump(mode="json"), is_error=True)
 
         try:
+            request_arguments = dict(params.arguments or {})
             with tracing.span(
                 "validate",
                 {"tool_name": tool_name, "attempt": 1},
             ):
-                request = registry.validate(tool_name, params.arguments or {})
+                try:
+                    request = registry.validate(tool_name, request_arguments)
+                except GatewayError as validation_error:
+                    diagnosis = diagnose(validation_error)
+                    repairable = diagnosis.category in {
+                        RepairFailure.SCHEMA_MISMATCH,
+                        RepairFailure.MALFORMED_JSON,
+                        RepairFailure.MISSING_REQUIRED_FIELD,
+                        RepairFailure.TYPE_COERCION,
+                    }
+                    if repair_advisor is None or not repairable:
+                        raise
+                    request_arguments = dict(
+                        await repair_advisor.repair(
+                            tool_name,
+                            request_arguments,
+                            registry.get(tool_name).input_schema,
+                            diagnosis,
+                        )
+                    )
+                    request = registry.validate(tool_name, request_arguments)
             await state_store.transition(call_id, ToolCallState.VALIDATED)
 
             with tracing.span(
@@ -318,6 +343,34 @@ async def execute_tool_call(
                     await state_store.start_attempt(call_id, latest_attempt)
                 await state_store.transition(call_id, ToolCallState.EXECUTING)
                 try:
+                    if latest_attempt > 1:
+                        with tracing.span(
+                            "policy",
+                            {
+                                "tool_name": tool_name,
+                                "attempt": attempt_number,
+                                "decision": "repaired_arguments",
+                            },
+                        ) as repaired_policy_span:
+                            repaired_request = registry.validate(tool_name, arguments)
+                            repaired_input = {
+                                "tool_name": tool_name,
+                                "risk_class": active_definition.risk_class.value,
+                                "arguments": repaired_request.model_dump(mode="json"),
+                            }
+                            repaired_decision = await active_policy_client.evaluate(
+                                repaired_input
+                            )
+                            repaired_policy_span.set_attribute(
+                                "decision", repaired_decision.outcome
+                            )
+                            repaired_policy_span.set_attribute(
+                                "matched_rule", repaired_decision.matched_rule
+                            )
+                            if repaired_decision.outcome != ALLOW:
+                                raise PolicyDeniedError(
+                                    "Repaired arguments were denied by policy"
+                                )
                     with (
                         tracing.span(
                             "sandbox",
@@ -347,10 +400,32 @@ async def execute_tool_call(
                     last_finished_attempt = attempt_number
                     latest_attempt += 1
 
+            async def repair_arguments(
+                arguments: Mapping[str, Any], diagnosis: FailureDiagnosis
+            ) -> Mapping[str, Any]:
+                """Delegate malformed-argument repair to the configured model."""
+
+                if repair_advisor is None:
+                    raise ToolExecutionError(
+                        "No repair advisor is configured for this tool call"
+                    )
+                return await repair_advisor.repair(
+                    tool_name,
+                    arguments,
+                    active_definition.input_schema,
+                    diagnosis,
+                )
+
             output, successful_attempt = await RepairLoop().run(
                 request.model_dump(mode="json"),
                 execute_attempt,
-                RepairContext(risk_class=active_definition.risk_class),
+                RepairContext(
+                    risk_class=active_definition.risk_class,
+                    idempotent=active_definition.idempotent,
+                    tool_name=tool_name,
+                    tool_schema=active_definition.input_schema,
+                ),
+                repair_arguments if repair_advisor is not None else None,
             )
             await state_store.transition(call_id, ToolCallState.SUCCEEDED)
             await write_audit("succeeded")
@@ -372,6 +447,7 @@ def create_mcp_server(
     approval_timeout_seconds: float = 300.0,
     audit_logger: AuditLogger | None = None,
     sandbox_runtime: str = "unknown",
+    repair_advisor: RepairAdvisor | None = None,
 ) -> Server[dict[str, Any]]:
     """Create the official MCP protocol adapter around the gateway runtime."""
 
@@ -407,6 +483,7 @@ def create_mcp_server(
             approval_timeout_seconds,
             audit_logger,
             sandbox_runtime,
+            repair_advisor,
         )
 
     return Server(
@@ -441,6 +518,17 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
         ttl_seconds=active_settings.state_ttl_seconds,
     )
     audit_logger = AuditLogger(active_settings.audit_log_path)
+    repair_advisor: RepairAdvisor | None = None
+    if (
+        active_settings.repair_enabled
+        and active_settings.repair_llm_api_key is not None
+    ):
+        repair_advisor = LLMRepairAdvisor(
+            str(active_settings.repair_llm_url),
+            active_settings.repair_llm_model,
+            active_settings.repair_llm_api_key.get_secret_value(),
+            active_settings.repair_llm_timeout_seconds,
+        )
     sandbox_runner = (
         None
         if active_settings.environment == "test"
@@ -463,6 +551,7 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
         approval_timeout_seconds=active_settings.approval_timeout_seconds,
         audit_logger=audit_logger,
         sandbox_runtime=active_settings.sandbox_runtime,
+        repair_advisor=repair_advisor,
     )
     try:
         async with stdio_server() as (read_stream, write_stream):

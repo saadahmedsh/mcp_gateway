@@ -195,4 +195,5 @@ def create_db_query_tool(
         input_model=DbQueryInput,
         output_model=DbQueryOutput,
         handler=handler,
+        idempotent=True,
     )

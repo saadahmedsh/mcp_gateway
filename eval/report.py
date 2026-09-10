@@ -31,9 +31,17 @@ def write_report(
         benchmarks_path.read_text(encoding="utf-8") if benchmarks_path.exists() else ""
     )
     marker = "## Phase 6 evaluation metrics"
-    prefix = existing.split(marker, maxsplit=1)[0].rstrip()
+    if marker in existing:
+        prefix, remainder = existing.split(marker, maxsplit=1)
+        suffix = ""
+        next_section = remainder.find("\n## ")
+        if next_section >= 0:
+            suffix = remainder[next_section:]
+    else:
+        prefix, suffix = existing, ""
     benchmarks_path.write_text(
-        prefix + "\n\n" + render_report(report), encoding="utf-8"
+        prefix.rstrip() + "\n\n" + render_report(report) + suffix,
+        encoding="utf-8",
     )
 
 

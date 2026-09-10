@@ -94,6 +94,13 @@ gateway dispatcher with an in-memory state backend for deterministic local
 measurements; production transport and sandbox measurements remain separate
 smoke checks.
 
+When `GATEWAY_REPAIR_ENABLED=true` and an API key is configured, malformed
+arguments are repaired by the configured OpenAI-compatible model. The model
+receives the exact Pydantic schema and validation diagnosis and must return a
+JSON argument object. The gateway validates and rechecks policy before every
+repaired attempt. Policy denials are never sent for repair; non-idempotent
+mutations that may have partially executed return `needs_review`.
+
 ## Quick start
 
 ### Prerequisites
@@ -177,6 +184,7 @@ make down
 make lint       # Ruff, Black, and strict mypy
 make test       # pytest suite
 make eval       # phase-appropriate evaluation target
+make eval-live  # real MCP + Redis + OPA + sandbox evaluation
 ```
 
 Verify a generated audit chain with:

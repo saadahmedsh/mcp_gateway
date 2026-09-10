@@ -217,6 +217,43 @@ CLI has a portable `--runtime-flag` option.
 - **Rejected:** Hard-coding benchmark numbers or requiring an external LLM for
   scenario repair, because either makes local verification nondeterministic.
 
+## ADR-0022: Use an injected LLM advisor with policy re-evaluation
+
+- **Status:** Accepted in Phase 6
+- **Decision:** Repair proposals come from an OpenAI-compatible endpoint behind
+  a typed advisor interface. The tool schema and exact failure diagnosis are
+  sent to the model. Every repaired argument set is validated and evaluated by
+  OPA again before execution.
+- **Reason:** Production repair needs model-guided diagnosis, while the gateway
+  must retain authority over the resulting call. Re-evaluation prevents a
+  repair from changing a safe request into an unauthorized one.
+- **Rejected:** Hard-coded argument substitutions and trusting the first policy
+  decision across retries, because both are brittle and can create an
+  authorization bypass.
+
+## ADR-0023: Make idempotency explicit for retry safety
+
+- **Status:** Accepted in Phase 6
+- **Decision:** Tool definitions declare `idempotent`. Read-only tools may retry
+  transient failures; mutating or destructive tools retry only when explicitly
+  idempotent. Otherwise a possible partial execution returns `needs_review`.
+- **Reason:** A timeout cannot prove that a side effect did not happen, so retry
+  safety must be a tool contract rather than an inference from the error.
+- **Rejected:** Retrying all failures or asking a human to approve every retry,
+  because either risks duplicate side effects or turns routine recovery into
+  an unbounded manual process.
+
+## ADR-0024: Separate offline and live evaluation modes
+
+- **Status:** Accepted in Phase 6
+- **Decision:** Keep `make eval` deterministic and add `make eval-live` for the
+  real MCP stdio, Redis, OPA, and sandbox path. Live results include measured
+  p50/p95 latency and are written separately.
+- **Reason:** Fast offline checks are suitable for CI, while live measurements
+  prove integration behavior and expose infrastructure-dependent latency.
+- **Rejected:** Making every evaluation depend on Docker and running services,
+  because developer feedback and CI would become slow and fragile.
+
 ## ADR-0018: Keep repair policy separate from authorization policy
 
 - **Status:** Accepted in Phase 5

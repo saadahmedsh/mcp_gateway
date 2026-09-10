@@ -1,7 +1,7 @@
 PYTHON ?= .venv/bin/python
 COMPOSE ?= docker compose
 
-.PHONY: up down test lint demo eval install sandbox-build
+.PHONY: up down test lint demo eval eval-live install sandbox-build
 
 install:
 	$(PYTHON) -m pip install --requirement requirements.lock
@@ -32,3 +32,6 @@ demo:
 eval:
 	$(PYTHON) -m eval.harness
 	$(PYTHON) -m eval.report
+
+eval-live:
+	$(PYTHON) -m eval.live

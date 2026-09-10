@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import AnyHttpUrl, RedisDsn
+from pydantic import AnyHttpUrl, RedisDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     sandbox_output_limit_bytes: int = 1_048_576
     sandbox_startup_timeout_seconds: float = 30.0
     audit_log_path: Path = Path("data/audit.jsonl")
+    repair_enabled: bool = False
+    repair_llm_url: AnyHttpUrl = AnyHttpUrl("http://localhost:4000/v1/chat/completions")
+    repair_llm_model: str = "repair-model"
+    repair_llm_api_key: SecretStr | None = None
+    repair_llm_timeout_seconds: float = 15.0
 
 
 @lru_cache

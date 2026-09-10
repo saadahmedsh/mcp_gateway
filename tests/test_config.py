@@ -21,6 +21,11 @@ def _clear_gateway_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "GATEWAY_APPROVAL_TIMEOUT_SECONDS",
         "GATEWAY_SANDBOX_RUNTIME",
         "GATEWAY_AUDIT_LOG_PATH",
+        "GATEWAY_REPAIR_ENABLED",
+        "GATEWAY_REPAIR_LLM_URL",
+        "GATEWAY_REPAIR_LLM_MODEL",
+        "GATEWAY_REPAIR_LLM_API_KEY",
+        "GATEWAY_REPAIR_LLM_TIMEOUT_SECONDS",
     )
     for name in names:
         monkeypatch.delenv(name, raising=False)

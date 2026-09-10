@@ -39,3 +39,23 @@ invented latency number.
 | sandbox_escape_attempts_blocked | 2 |
 | sandbox_escape_attempts_total | 2 |
 | scenario_count | 7 |
+
+## Live MCP evaluation
+
+`make eval-live` runs the same scenarios through a real MCP stdio process with
+Redis, OPA, and the configured sandbox runtime. A development-host run on
+2026-09-10 produced:
+
+| Metric | Value |
+|---|---:|
+| scenario_count | 7 |
+| pass_rate | 1.0 |
+| latency_mean_ms | 2217.73 |
+| latency_p50_ms | 2091.15 |
+| latency_p95_ms | 3172.67 |
+| policy_gate_accuracy_percent | 100.0 |
+| sandbox_escape_attempts_blocked | 2 / 2 |
+
+Re-run `make eval-live` to regenerate `eval/live-results.json`; latency varies
+with Docker startup and host load. Approval scenarios intentionally use a
+two-second timeout so unattended evaluations cannot block indefinitely.
