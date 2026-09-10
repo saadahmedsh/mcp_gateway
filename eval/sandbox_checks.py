@@ -34,10 +34,11 @@ async def main() -> None:
     """Run host filesystem, network, and timeout checks."""
 
     runner = SandboxRunner()
+    host_file = (Path.cwd() / "README.md").resolve()
     results = [
         await _expect_blocked(
             runner,
-            ["python", "-c", "open('/host-secret-that-is-not-mounted').read()"],
+            ["python", "-c", f"open({str(host_file)!r}).read()"],
             "host-file",
         ),
         await _expect_blocked(
