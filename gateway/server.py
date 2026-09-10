@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -41,6 +42,7 @@ from gateway.policy.client import (
 )
 from gateway.policy.decisions import ALLOW, REQUIRES_APPROVAL
 from gateway.registry import ToolDefinition, ToolRegistry
+from gateway.repair.loop import RepairContext, RepairLoop
 from gateway.sandbox.runner import SandboxRunner
 from gateway.state.redis_store import (
     InMemoryStateStore,
@@ -166,6 +168,8 @@ async def execute_tool_call(
             tool_name=tool_name,
         )
         logger = structlog.get_logger()
+        latest_attempt = 1
+        last_finished_attempt = 1
 
         async def fail(error: GatewayError) -> types.CallToolResult:
             """Persist a failed state and return its structured client response."""
@@ -185,7 +189,7 @@ async def execute_tool_call(
                 await state_store.transition(call_id, terminal_state, error=str(error))
                 await state_store.finish_attempt(
                     call_id,
-                    1,
+                    last_finished_attempt,
                     "denied" if terminal_state is ToolCallState.DENIED else "failed",
                     error=str(error),
                 )
@@ -259,20 +263,51 @@ async def execute_tool_call(
                     )
                     raise PolicyDeniedError(decision.reason)
 
-            with tracing.span(
-                "sandbox",
-                {"tool_name": tool_name, "attempt": 1, "runtime": "in_process"},
-            ):
-                await state_store.transition(call_id, ToolCallState.EXECUTING)
+            async def execute_attempt(arguments: Mapping[str, Any]) -> Any:
+                """Execute one bounded attempt and persist its result."""
 
-            with tracing.span(
-                "execute",
-                {"tool_name": tool_name, "attempt": 1},
-            ):
-                output = await registry.execute_validated(tool_name, request)
+                nonlocal last_finished_attempt, latest_attempt
+                attempt_number = latest_attempt
+                if latest_attempt > 1:
+                    await state_store.start_attempt(call_id, latest_attempt)
+                await state_store.transition(call_id, ToolCallState.EXECUTING)
+                try:
+                    with (
+                        tracing.span(
+                            "sandbox",
+                            {
+                                "tool_name": tool_name,
+                                "attempt": attempt_number,
+                                "runtime": "sandbox",
+                            },
+                        ),
+                        tracing.span(
+                            "execute",
+                            {"tool_name": tool_name, "attempt": attempt_number},
+                        ),
+                    ):
+                        validated = registry.validate(tool_name, arguments)
+                        result = await registry.execute_validated(tool_name, validated)
+                    await state_store.finish_attempt(
+                        call_id, attempt_number, "succeeded"
+                    )
+                    return result
+                except GatewayError as error:
+                    await state_store.finish_attempt(
+                        call_id, attempt_number, "failed", error=str(error)
+                    )
+                    raise
+                finally:
+                    last_finished_attempt = attempt_number
+                    latest_attempt += 1
+
+            output, successful_attempt = await RepairLoop().run(
+                request.model_dump(mode="json"),
+                execute_attempt,
+                RepairContext(risk_class=active_definition.risk_class),
+            )
             await state_store.transition(call_id, ToolCallState.SUCCEEDED)
-            await state_store.finish_attempt(call_id, 1, "succeeded")
-            logger.info("tool_call_succeeded", attempt=1)
+            logger.info("tool_call_succeeded", attempt=successful_attempt)
             return _tool_result(output.model_dump(mode="json"), is_error=False)
         except GatewayError as error:
             return await fail(error)

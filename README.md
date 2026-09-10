@@ -3,8 +3,9 @@
 A security and reliability control plane between LLM agents and the tools they
 invoke through the Model Context Protocol (MCP).
 
-> **Project status:** Phase 4 sandbox execution is implemented for the live
-> gateway path, with gVisor host validation still pending. A real MCP client can discover
+> **Project status:** Phase 5 bounded repair and safe retry handling is
+> implemented on top of the Phase 4 sandbox path. gVisor host validation is
+> still pending. A real MCP client can discover
 > tools and execute calls while the gateway persists lifecycle state, emits
 > traces, and evaluates every live call through fail-closed OPA policy. Mutating
 > and destructive calls pause for explicit CLI approval. Repair and the audit
@@ -60,7 +61,7 @@ SQLite query runner │ shell executor │ Git workspace
 | 2 | Redis lifecycle state and OpenTelemetry tracing | Complete |
 | 3 | OPA policy enforcement and human approval | Complete |
 | 4 | gVisor and hardened-Docker execution | In progress |
-| 5 | Bounded repair and retry orchestration | Planned |
+| 5 | Bounded repair and retry orchestration | Implemented |
 | 6 | Hash-chained audit and evaluation harness | Planned |
 | 7 | Container packaging, Helm, and CI | Planned |
 
@@ -79,6 +80,11 @@ Phase 4 runs live tool calls in a fresh hardened Docker container. The default
 profile has no network, no capabilities, a read-only root filesystem, a tmpfs
 workspace, seccomp, memory/CPU/pids limits, output limits, and explicit cleanup.
 The gVisor runtime is selectable when `runsc` is installed.
+
+Phase 5 diagnoses failures into schema, timeout, sandbox, policy, and tool
+categories. Read-only transient failures are retried with bounded exponential
+backoff. Policy denials are terminal, and non-idempotent mutations surface as
+`needs_review` instead of being retried blindly.
 
 ## Quick start
 

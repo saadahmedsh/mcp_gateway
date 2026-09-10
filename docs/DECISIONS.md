@@ -191,3 +191,23 @@ from later phases will be added only when those phases begin.
 The Docker daemon must configure runsc with `platform=ptrace` in its runtime
 arguments; the gateway selects `--runtime runsc` and does not pretend Docker's
 CLI has a portable `--runtime-flag` option.
+
+## ADR-0018: Keep repair policy separate from authorization policy
+
+- **Status:** Accepted in Phase 5
+- **Decision:** The repair loop may retry schema/tool/transient sandbox failures
+  within explicit attempt and wall-clock limits, but it classifies every policy
+  denial as terminal. Repaired arguments are never rewritten to evade OPA.
+- **Reason:** Reliability must not become an authorization bypass.
+- **Rejected:** Retrying every exception uniformly, because a denial or partial
+  mutation could be repeated indefinitely.
+
+## ADR-0019: Retry only safe or explicitly idempotent operations
+
+- **Status:** Accepted in Phase 5
+- **Decision:** Read-only operations may retry timeout and sandbox failures.
+  Mutating and destructive operations require an explicit idempotent declaration;
+  otherwise a possible partial execution returns `needs_review`.
+- **Reason:** A timeout does not prove that the remote side did nothing.
+- **Rejected:** Blind retries based only on the exception type, because they can
+  duplicate side effects.

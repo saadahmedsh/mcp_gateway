@@ -10,6 +10,7 @@ from redis.exceptions import RedisError, WatchError
 
 from gateway.errors import StateStoreUnavailableError
 from gateway.models import (
+    AttemptRecord,
     StateTransition,
     ToolCallRecord,
     ToolCallState,
@@ -31,6 +32,9 @@ class StateStore(Protocol):
         self, call_id: str, attempt: int, outcome: str, error: str | None = None
     ) -> None:
         """Complete one recorded execution attempt."""
+
+    async def start_attempt(self, call_id: str, attempt: int) -> None:
+        """Append a new execution attempt to a call record."""
 
     async def get_call(self, call_id: str) -> ToolCallRecord | None:
         """Read one call record by identifier."""
@@ -160,6 +164,15 @@ class RedisStateStore:
 
         await self._update(call_id, update)
 
+    async def start_attempt(self, call_id: str, attempt: int) -> None:
+        """Append a new attempt with a start timestamp."""
+
+        def update(record: ToolCallRecord) -> None:
+            record.attempts.append(AttemptRecord(attempt=attempt, started_at=utc_now()))
+            record.updated_at = utc_now()
+
+        await self._update(call_id, update)
+
     async def get_call(self, call_id: str) -> ToolCallRecord | None:
         """Read and validate one Redis call record."""
 
@@ -247,6 +260,15 @@ class InMemoryStateStore:
                     record.updated_at = utc_now()
                     return
             raise StateStoreUnavailableError()
+
+        await self._update(call_id, update)
+
+    async def start_attempt(self, call_id: str, attempt: int) -> None:
+        """Append a new in-memory attempt."""
+
+        def update(record: ToolCallRecord) -> None:
+            record.attempts.append(AttemptRecord(attempt=attempt, started_at=utc_now()))
+            record.updated_at = utc_now()
 
         await self._update(call_id, update)
 

@@ -92,6 +92,15 @@ class SandboxTimeoutError(SandboxError):
         super().__init__("Sandbox execution exceeded its wall-clock timeout")
 
 
+class NeedsReviewError(GatewayError):
+    """Raised when a failed mutation cannot be safely retried."""
+
+    def __init__(self, message: str) -> None:
+        """Initialize a manual-review response."""
+
+        super().__init__("needs_review", message)
+
+
 class StateStoreUnavailableError(GatewayError):
     """Raised when durable call state cannot be read or written."""
 

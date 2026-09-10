@@ -52,6 +52,19 @@ class AttemptRecord(StrictModel):
     error: str | None = None
 
 
+class RepairFailure(StrEnum):
+    """Failure classes understood by the repair policy."""
+
+    SCHEMA_MISMATCH = "schema_mismatch"
+    MALFORMED_JSON = "malformed_json"
+    MISSING_REQUIRED_FIELD = "missing_required_field"
+    TYPE_COERCION = "type_coercion"
+    TIMEOUT = "timeout"
+    SANDBOX_CRASH = "sandbox_crash"
+    POLICY_DENIED = "policy_denied"
+    TOOL_ERROR = "tool_error"
+
+
 class ToolCallRecord(StrictModel):
     """Durable state and attempt history for one tool invocation."""
 
