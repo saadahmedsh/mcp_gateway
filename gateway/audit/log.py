@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from gateway.models import AttemptRecord, AuditRecord, RepairAttemptRecord
+from gateway.models import AttemptRecord, AuditRecord, Principal, RepairAttemptRecord
 
 _GENESIS_HASH = "0" * 64
 
@@ -100,6 +100,7 @@ class AuditLogger:
         repair_attempts: list[RepairAttemptRecord] | None = None,
         outcome: str,
         duration_ms: float,
+        principal: Principal | None = None,
         timestamp: datetime | None = None,
     ) -> AuditRecord:
         """Append one completed tool-call event without blocking the event loop."""
@@ -119,6 +120,7 @@ class AuditLogger:
             "repair_attempts": repair_attempts or [],
             "outcome": outcome,
             "duration_ms": duration_ms,
+            "principal": principal,
         }
         if timestamp is not None:
             fields["timestamp"] = timestamp

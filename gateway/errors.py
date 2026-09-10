@@ -25,6 +25,24 @@ class GatewayError(Exception):
         )
 
 
+class AuthenticationError(GatewayError):
+    """Raised when an HTTP caller cannot be authenticated."""
+
+    def __init__(self, message: str = "Authentication failed") -> None:
+        """Initialize an authentication failure."""
+
+        super().__init__("authentication_failed", message)
+
+
+class AuthorizationError(GatewayError):
+    """Raised when an authenticated caller lacks a required role or tenant."""
+
+    def __init__(self, message: str = "Authorization failed") -> None:
+        """Initialize an authorization failure."""
+
+        super().__init__("authorization_failed", message)
+
+
 class ToolNotFoundError(GatewayError):
     """Raised when a requested tool is not registered."""
 

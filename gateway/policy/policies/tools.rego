@@ -7,11 +7,21 @@ default decision := {
 }
 
 decision := {
+  "outcome": "deny",
+  "matched_rule": "invalid_principal",
+  "reason": "A verified tenant and supported role are required"
+} if {
+  input.principal
+  not caller_authorized
+}
+
+decision := {
   "outcome": "allow",
   "matched_rule": "read_only_tool",
   "reason": "Read-only tools are allowed"
 } if {
   input.risk_class == "read_only"
+  caller_authorized
   not destructive
 }
 
@@ -21,6 +31,7 @@ decision := {
   "reason": "Destructive operations require explicit approval and a reason"
 } if {
   destructive
+  caller_elevated
 }
 
 decision := {
@@ -29,6 +40,7 @@ decision := {
   "reason": "Mutating tools require explicit approval"
 } if {
   input.risk_class == "mutating"
+  caller_elevated
   not destructive
 }
 
@@ -38,7 +50,28 @@ decision := {
   "reason": "Destructive tools require explicit approval and a reason"
 } if {
   input.risk_class == "destructive"
+  caller_elevated
   not destructive
+}
+
+caller_authorized if {
+  not input.principal
+}
+
+caller_authorized if {
+  input.principal.tenant_id != ""
+  some role in input.principal.roles
+  role in {"user", "operator", "admin"}
+}
+
+caller_elevated if {
+  not input.principal
+}
+
+caller_elevated if {
+  input.principal.tenant_id != ""
+  some role in input.principal.roles
+  role in {"operator", "admin"}
 }
 
 destructive if {

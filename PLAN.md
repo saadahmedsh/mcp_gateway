@@ -353,20 +353,26 @@ system from a secure single-tenant gateway into a deployment-ready control plane
 Each stage remains independently verifiable and must not weaken the existing
 policy, approval, repair, audit, or sandbox boundaries.
 
-#### Stage A — Documentation and scope
+#### Stage A — Documentation and scope (complete)
 
 - Update the README with the production architecture, request walkthrough,
   benchmark interpretation, local staging instructions, and explicit limits.
 - Record the scope expansion from the original single-tenant anti-goals in
   `docs/DECISIONS.md` and update the threat model.
 
-#### Stage B — Identity, RBAC, and tenant context
+#### Stage B — Identity, RBAC, and tenant context (implemented foundation)
 
 - Add JWT/OIDC validation through a JWKS endpoint.
 - Model `user`, `operator`, and `admin` roles and a required tenant identifier.
 - Include subject, tenant, roles, and agent identity in every OPA input, audit
   record, trace, approval, and PostgreSQL execution record.
-- Deny missing or cross-tenant context by default.
+- Deny missing tenant context by default; cross-tenant resource enforcement is
+  completed when Stage C persistence introduces tenant-owned records.
+
+The current foundation provides RS256 JWT verification against a configured
+JWKS endpoint, static-token compatibility for local staging, request-scoped
+principals, and identity-aware OPA inputs. PostgreSQL-backed identity records,
+tenant administration, and cross-tenant data enforcement remain Stage C work.
 
 #### Stage C — Durable control-plane persistence
 

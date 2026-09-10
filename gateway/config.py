@@ -52,7 +52,12 @@ class Settings(BaseSettings):
     http_host: str = "0.0.0.0"
     http_port: int = 8080
     http_path: str = "/mcp"
+    http_auth_mode: Literal["none", "static_token", "oidc"] = "none"
     http_auth_token: SecretStr | None = None
+    oidc_issuer_url: AnyHttpUrl | None = None
+    oidc_audience: str | None = None
+    oidc_jwks_url: AnyHttpUrl | None = None
+    oidc_timeout_seconds: float = 2.0
     http_max_request_body_bytes: int = 4 * 1024 * 1024
     http_session_idle_timeout_seconds: float = 1800.0
     http_max_sessions: int = 10_000

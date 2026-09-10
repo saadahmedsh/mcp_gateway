@@ -60,6 +60,16 @@ spec:
               value: {{ .Values.gateway.httpPort | quote }}
             - name: GATEWAY_HTTP_PATH
               value: {{ .Values.gateway.httpPath | quote }}
+            - name: GATEWAY_HTTP_AUTH_MODE
+              value: {{ .Values.gateway.httpAuthMode | quote }}
+            - name: GATEWAY_OIDC_ISSUER_URL
+              value: {{ .Values.gateway.oidcIssuerUrl | quote }}
+            - name: GATEWAY_OIDC_AUDIENCE
+              value: {{ .Values.gateway.oidcAudience | quote }}
+            - name: GATEWAY_OIDC_JWKS_URL
+              value: {{ .Values.gateway.oidcJwksUrl | quote }}
+            - name: GATEWAY_OIDC_TIMEOUT_SECONDS
+              value: {{ .Values.gateway.oidcTimeoutSeconds | quote }}
             - name: GATEWAY_HTTP_MAX_REQUEST_BODY_BYTES
               value: {{ .Values.gateway.httpMaxRequestBodyBytes | quote }}
             - name: GATEWAY_HTTP_SESSION_IDLE_TIMEOUT_SECONDS

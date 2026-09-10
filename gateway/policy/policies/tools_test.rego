@@ -59,3 +59,55 @@ test_safe_delete_with_where_is_allowed_by_declared_risk if {
     "reason": "Read-only tools are allowed"
   }
 }
+
+test_user_read_only_is_allowed if {
+  decision with input as {
+    "tool_name": "db_query",
+    "risk_class": "read_only",
+    "arguments": {"query": "SELECT * FROM orders"},
+    "principal": {"tenant_id": "tenant-a", "roles": ["user"]}
+  } == {
+    "outcome": "allow",
+    "matched_rule": "read_only_tool",
+    "reason": "Read-only tools are allowed"
+  }
+}
+
+test_user_destructive_is_denied if {
+  decision with input as {
+    "tool_name": "shell_exec",
+    "risk_class": "destructive",
+    "arguments": {"command": "printf safe"},
+    "principal": {"tenant_id": "tenant-a", "roles": ["user"]}
+  } == {
+    "outcome": "deny",
+    "matched_rule": "default_deny",
+    "reason": "No policy rule matched"
+  }
+}
+
+test_operator_destructive_requires_approval if {
+  decision with input as {
+    "tool_name": "shell_exec",
+    "risk_class": "destructive",
+    "arguments": {"command": "printf safe"},
+    "principal": {"tenant_id": "tenant-a", "roles": ["operator"]}
+  } == {
+    "outcome": "requires_approval",
+    "matched_rule": "destructive_risk_class",
+    "reason": "Destructive tools require explicit approval and a reason"
+  }
+}
+
+test_missing_tenant_is_denied if {
+  decision with input as {
+    "tool_name": "db_query",
+    "risk_class": "read_only",
+    "arguments": {"query": "SELECT * FROM orders"},
+    "principal": {"roles": ["user"]}
+  } == {
+    "outcome": "deny",
+    "matched_rule": "invalid_principal",
+    "reason": "A verified tenant and supported role are required"
+  }
+}

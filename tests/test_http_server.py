@@ -18,6 +18,7 @@ def _settings(tmp_path: Path, token: str | None = None) -> Settings:
         state_store_backend="memory",
         database_path=tmp_path / "gateway.sqlite",
         audit_log_path=tmp_path / "audit.jsonl",
+        http_auth_mode="static_token" if token is not None else "none",
         http_auth_token=SecretStr(token) if token is not None else None,
     )
 
@@ -48,7 +49,7 @@ async def test_http_requests_require_configured_bearer_token(tmp_path: Path) -> 
         denied = await client.get("/mcp")
         assert denied.status_code == 401
         allowed = await client.get(
-            "/livez",
+            "/not-a-route",
             headers={"Authorization": "Bearer local-test-token"},
         )
-        assert allowed.status_code == 200
+        assert allowed.status_code == 404

@@ -12,7 +12,14 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from gateway import __version__
 from gateway.audit.log import AuditLogger
+from gateway.auth import (
+    OIDCAuthenticator,
+    principal_from_static_token,
+    reset_current_principal,
+    set_current_principal,
+)
 from gateway.config import Settings, get_settings
+from gateway.errors import AuthenticationError
 from gateway.hitl.queue import RedisApprovalQueue
 from gateway.policy.client import AllowAllPolicyClient, OpaPolicyClient, PolicyClient
 from gateway.repair.advisor import (
@@ -27,28 +34,42 @@ from gateway.tools.db_query import seed_database
 from gateway.tracing.otel import configure_logging, create_tracing
 
 
-class BearerTokenMiddleware:
-    """Protect HTTP requests with an optional static bearer token."""
+class AuthenticationMiddleware:
+    """Authenticate HTTP requests with static or OIDC bearer credentials."""
 
-    def __init__(self, app: ASGIApp, token: str | None) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        mode: str,
+        token: str | None = None,
+        oidc: OIDCAuthenticator | None = None,
+    ) -> None:
         """Create middleware around an ASGI application."""
 
         self.app = app
+        self.mode = mode
         self.token = token
+        self.oidc = oidc
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Authenticate HTTP requests before dispatching them."""
 
         if (
             scope["type"] != "http"
-            or self.token is None
-            or scope.get("path") in {"/livez", "/readyz", "/startupz"}
+            or scope.get("path")
+            in {
+                "/livez",
+                "/readyz",
+                "/startupz",
+            }
+            or self.mode == "none"
         ):
             await self.app(scope, receive, send)
             return
         headers = {key.lower(): value for key, value in scope.get("headers", [])}
-        expected = f"Bearer {self.token}".encode()
-        if headers.get(b"authorization") != expected:
+        authorization = headers.get(b"authorization", b"").decode("latin-1")
+        scheme, _, credential = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not credential:
             response = JSONResponse(
                 {"error": "unauthorized"},
                 status_code=401,
@@ -56,7 +77,33 @@ class BearerTokenMiddleware:
             )
             await response(scope, receive, send)
             return
-        await self.app(scope, receive, send)
+        try:
+            if self.mode == "static_token":
+                if self.token is None or credential != self.token:
+                    raise AuthenticationError("Bearer token is invalid")
+                principal = principal_from_static_token()
+            elif self.mode == "oidc":
+                if self.oidc is None:
+                    raise AuthenticationError("OIDC authentication is not configured")
+                principal = await self.oidc.authenticate(credential)
+            else:
+                raise AuthenticationError("HTTP authentication mode is invalid")
+        except AuthenticationError:
+            response = JSONResponse(
+                {"error": "unauthorized"},
+                status_code=401,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            await response(scope, receive, send)
+            return
+        token = set_current_principal(principal)
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            reset_current_principal(token)
+
+
+BearerTokenMiddleware = AuthenticationMiddleware
 
 
 def _health_response(status: str, checks: dict[str, bool] | None = None) -> Response:
@@ -192,7 +239,28 @@ def create_http_app(settings: Settings | None = None) -> ASGIApp:
         if active_settings.http_auth_token is not None
         else None
     )
-    return BearerTokenMiddleware(mcp_app, token)
+    oidc: OIDCAuthenticator | None = None
+    if active_settings.http_auth_mode == "oidc":
+        if (
+            active_settings.oidc_issuer_url is None
+            or active_settings.oidc_audience is None
+            or active_settings.oidc_jwks_url is None
+        ):
+            raise ValueError(
+                "OIDC mode requires issuer, audience, and JWKS configuration"
+            )
+        oidc = OIDCAuthenticator(
+            str(active_settings.oidc_issuer_url),
+            active_settings.oidc_audience,
+            str(active_settings.oidc_jwks_url),
+            active_settings.oidc_timeout_seconds,
+        )
+    return AuthenticationMiddleware(
+        mcp_app,
+        active_settings.http_auth_mode,
+        token,
+        oidc,
+    )
 
 
 def main() -> None:

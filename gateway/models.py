@@ -21,6 +21,29 @@ class RiskClass(StrEnum):
     DESTRUCTIVE = "destructive"
 
 
+class Role(StrEnum):
+    """Roles recognized by the gateway authorization boundary."""
+
+    USER = "user"
+    OPERATOR = "operator"
+    ADMIN = "admin"
+
+
+class Principal(StrictModel):
+    """Verified caller identity propagated through one tool invocation."""
+
+    subject: str = Field(min_length=1, max_length=256)
+    tenant_id: str = Field(min_length=1, max_length=256)
+    roles: list[Role] = Field(min_length=1)
+    issuer: str | None = None
+    agent_id: str | None = None
+
+    def has_role(self, role: Role) -> bool:
+        """Return whether the principal contains a given role."""
+
+        return role in self.roles
+
+
 class ToolCallState(StrEnum):
     """Lifecycle states persisted for one tool call."""
 
@@ -90,6 +113,7 @@ class ToolCallRecord(StrictModel):
     attempts: list[AttemptRecord]
     created_at: datetime
     updated_at: datetime
+    principal: Principal | None = None
 
 
 class PolicyDecision(StrictModel):
@@ -157,3 +181,4 @@ class AuditRecord(StrictModel):
     duration_ms: float
     previous_hash: str
     record_hash: str
+    principal: Principal | None = None

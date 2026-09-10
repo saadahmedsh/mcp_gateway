@@ -70,7 +70,8 @@ SQLite query runner │ shell executor │ Git workspace
 | 7 | Container packaging, Helm, and CI | Implemented |
 | 8 | Production hardening and Kind deployment | Implemented with local limits |
 | A | Documentation and scope expansion | In progress |
-| B–F | Identity, persistence, workers, evaluation gates, production integrations | Planned |
+| B | JWT/OIDC foundation, RBAC vocabulary, tenant-aware policy context | Implemented foundation |
+| C–F | PostgreSQL, workers, evaluation gates, production integrations | Planned |
 
 Phase 2 records each call as `received`, `validated`, `policy_checked`,
 `executing`, and a terminal state. It creates a root `tool_call` span plus
@@ -326,12 +327,37 @@ by Git; `.env.example` contains safe defaults.
 | `GATEWAY_REPAIR_LLM_MODEL` | `repair-model` | Provider-specific model identifier |
 | `GATEWAY_REPAIR_LLM_ANTHROPIC_VERSION` | `2023-06-01` | Anthropic API version header |
 | `GATEWAY_REPAIR_LLM_MAX_TOKENS` | `1024` | Maximum repair response tokens |
+| `GATEWAY_HTTP_AUTH_MODE` | `none` | `none`, `static_token`, or `oidc` HTTP authentication |
+| `GATEWAY_HTTP_AUTH_TOKEN` | unset | Local-only static bearer token |
+| `GATEWAY_OIDC_ISSUER_URL` | unset | OIDC issuer URL |
+| `GATEWAY_OIDC_AUDIENCE` | unset | Expected JWT audience |
+| `GATEWAY_OIDC_JWKS_URL` | unset | OIDC JSON Web Key Set URL |
+| `GATEWAY_OIDC_TIMEOUT_SECONDS` | `2.0` | OIDC key-fetch timeout |
 | `GATEWAY_SANDBOX_RUNTIME` | `hardened-docker` | `hardened-docker` or `gvisor` |
 | `GATEWAY_SANDBOX_IMAGE` | `mcp-gateway-tool:local` | Tool image used for isolated calls |
 | `GATEWAY_SANDBOX_OUTPUT_LIMIT_BYTES` | `1048576` | Maximum combined stream size per stream |
 | `GATEWAY_AUDIT_LOG_PATH` | `data/audit.jsonl` | Hash-chained audit destination |
 
 Never commit `.env`, credentials, tokens, private keys, or production data.
+
+### OIDC configuration
+
+For a network deployment, set `GATEWAY_HTTP_AUTH_MODE=oidc` and configure the
+issuer, audience, and JWKS URL. Tokens must use RS256 and contain `sub`,
+`tenant_id`, `roles`, `iss`, `aud`, and `exp` claims. Supported roles are
+`user`, `operator`, and `admin`.
+
+```dotenv
+GATEWAY_HTTP_AUTH_MODE=oidc
+GATEWAY_OIDC_ISSUER_URL=https://identity.example/realms/gateway
+GATEWAY_OIDC_AUDIENCE=mcp-gateway
+GATEWAY_OIDC_JWKS_URL=https://identity.example/realms/gateway/protocol/openid-connect/certs
+```
+
+`static_token` is retained only for local staging compatibility. `none` is for
+local development and must not be used for production traffic. OPA receives the
+verified principal and tenant context on every tool call; the client cannot
+override those values through tool arguments.
 
 ## Failure modes and planned improvements
 

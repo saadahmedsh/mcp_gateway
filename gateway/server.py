@@ -16,6 +16,7 @@ from mcp.server.stdio import stdio_server
 
 from gateway import __version__
 from gateway.audit.log import AuditLogger
+from gateway.auth import get_current_principal
 from gateway.config import Settings, get_settings
 from gateway.errors import (
     ApprovalRejectedError,
@@ -32,6 +33,7 @@ from gateway.hitl.queue import (
 )
 from gateway.models import (
     AttemptRecord,
+    Principal,
     RepairAttemptRecord,
     RepairFailure,
     RiskClass,
@@ -132,6 +134,7 @@ async def execute_tool_call(
     audit_logger: AuditLogger | None = None,
     sandbox_runtime: str = "unknown",
     repair_advisor: RepairAdvisor | None = None,
+    principal: Principal | None = None,
 ) -> types.CallToolResult:
     """Run one request through state persistence, tracing, and tool execution."""
 
@@ -153,6 +156,13 @@ async def execute_tool_call(
             "tool_name": tool_name,
             "risk_class": risk_class.value if risk_class else "unknown",
             "attempt": 1,
+            "subject": principal.subject if principal else "anonymous",
+            "tenant_id": principal.tenant_id if principal else "local",
+            "roles": (
+                ",".join(role.value for role in principal.roles)
+                if principal
+                else "admin"
+            ),
         },
     ) as root_span:
         trace_id = f"{root_span.get_span_context().trace_id:032x}"
@@ -169,6 +179,7 @@ async def execute_tool_call(
             attempts=[AttemptRecord(attempt=1, started_at=now)],
             created_at=now,
             updated_at=now,
+            principal=principal,
         )
         try:
             await state_store.create_call(record)
@@ -180,6 +191,8 @@ async def execute_tool_call(
             trace_id=trace_id,
             session_id=session_id,
             tool_name=tool_name,
+            subject=principal.subject if principal else "anonymous",
+            tenant_id=principal.tenant_id if principal else "local",
         )
         logger = structlog.get_logger()
         latest_attempt = 1
@@ -218,6 +231,7 @@ async def execute_tool_call(
                     repair_attempts=repair_attempts,
                     outcome=outcome,
                     duration_ms=(time.monotonic() - started_monotonic) * 1000,
+                    principal=principal,
                 )
             except Exception as audit_error:
                 logger.warning("audit_write_failed", error=str(audit_error))
@@ -308,6 +322,15 @@ async def execute_tool_call(
                     "tool_name": tool_name,
                     "risk_class": active_definition.risk_class.value,
                     "arguments": request.model_dump(mode="json"),
+                    "principal": (
+                        principal.model_dump(mode="json")
+                        if principal is not None
+                        else {
+                            "subject": "anonymous",
+                            "tenant_id": "local",
+                            "roles": ["admin"],
+                        }
+                    ),
                 }
                 decision = await active_policy_client.evaluate(policy_input)
                 policy_outcome = decision.outcome
@@ -384,6 +407,15 @@ async def execute_tool_call(
                                 "tool_name": tool_name,
                                 "risk_class": active_definition.risk_class.value,
                                 "arguments": repaired_request.model_dump(mode="json"),
+                                "principal": (
+                                    principal.model_dump(mode="json")
+                                    if principal is not None
+                                    else {
+                                        "subject": "anonymous",
+                                        "tenant_id": "local",
+                                        "roles": ["admin"],
+                                    }
+                                ),
                             }
                             repaired_decision = await active_policy_client.evaluate(
                                 repaired_input
@@ -499,6 +531,7 @@ def create_mcp_server(
     audit_logger: AuditLogger | None = None,
     sandbox_runtime: str = "unknown",
     repair_advisor: RepairAdvisor | None = None,
+    principal: Principal | None = None,
 ) -> Server[dict[str, Any]]:
     """Create the official MCP protocol adapter around the gateway runtime."""
 
@@ -535,6 +568,7 @@ def create_mcp_server(
             audit_logger,
             sandbox_runtime,
             repair_advisor,
+            get_current_principal() or principal,
         )
 
     return Server(

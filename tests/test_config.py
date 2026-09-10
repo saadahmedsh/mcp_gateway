@@ -30,6 +30,10 @@ def _clear_gateway_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "GATEWAY_HTTP_PORT",
         "GATEWAY_HTTP_PATH",
         "GATEWAY_HTTP_AUTH_TOKEN",
+        "GATEWAY_HTTP_AUTH_MODE",
+        "GATEWAY_OIDC_ISSUER_URL",
+        "GATEWAY_OIDC_AUDIENCE",
+        "GATEWAY_OIDC_JWKS_URL",
         "GATEWAY_HTTP_MAX_REQUEST_BODY_BYTES",
         "GATEWAY_HTTP_SESSION_IDLE_TIMEOUT_SECONDS",
         "GATEWAY_HTTP_MAX_SESSIONS",
@@ -55,6 +59,7 @@ def test_settings_have_safe_local_defaults(
     assert settings.http_host == "0.0.0.0"
     assert settings.http_port == 8080
     assert settings.http_path == "/mcp"
+    assert settings.http_auth_mode == "none"
 
 
 def test_settings_can_be_overridden_from_environment(

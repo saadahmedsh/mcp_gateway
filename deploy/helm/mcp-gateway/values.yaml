@@ -37,7 +37,12 @@ gateway:
   httpHost: 0.0.0.0
   httpPort: "8080"
   httpPath: /mcp
+  httpAuthMode: none
   httpAuthToken: ""
+  oidcIssuerUrl: ""
+  oidcAudience: ""
+  oidcJwksUrl: ""
+  oidcTimeoutSeconds: "2.0"
   httpMaxRequestBodyBytes: "4194304"
   httpSessionIdleTimeoutSeconds: "1800"
   httpMaxSessions: "10000"
