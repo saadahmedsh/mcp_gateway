@@ -1,7 +1,7 @@
 PYTHON ?= .venv/bin/python
 COMPOSE ?= docker compose
 
-.PHONY: up down test lint demo eval eval-live install sandbox-build kind-up kind-load kind-deploy kind-down
+.PHONY: up down test lint demo eval eval-live eval-realistic install sandbox-build kind-up kind-load kind-deploy kind-down
 
 install:
 	$(PYTHON) -m pip install --requirement requirements.lock
@@ -35,6 +35,9 @@ eval:
 
 eval-live:
 	$(PYTHON) -m eval.live
+
+eval-realistic:
+	$(PYTHON) -m eval.realistic
 
 kind-up:
 	kind create cluster --config docker/kind-config.yaml

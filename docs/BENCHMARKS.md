@@ -22,6 +22,12 @@ The live harness measures the real MCP stdio transport, Redis, OPA, and the
 configured Docker sandbox. It remains a single-host smoke test rather than a
 multi-node throughput or availability benchmark.
 
+`make eval-realistic` generates a seeded corpus and runs it through one live
+MCP session. Use `--seed` and `--repetitions` to control the corpus size. The
+result stores the seed, generation version, per-scenario outcome, and latency
+in `eval/realistic-results.json`, making benchmark-post numbers reproducible
+without copying a fixed list of requests.
+
 Phase 8 adds HTTP and Kind deployment smoke checks but does not yet provide
 production latency numbers. Those require a running Kind or cloud staging
 cluster and must record the cluster, runtime, image digest, concurrency, and
@@ -74,6 +80,37 @@ Redis, OPA, and the configured sandbox runtime. A development-host run on
 Re-run `make eval-live` to regenerate `eval/live-results.json`; latency varies
 with Docker startup and host load. Approval scenarios intentionally use a
 two-second timeout so unattended evaluations cannot block indefinitely.
+
+## Generated realistic live run
+
+The following run used `eval.realistic` with a seeded generator rather than the
+checked-in seven-scenario corpus:
+
+```bash
+.venv/bin/python -m eval.realistic --seed 20260910 --repetitions 2
+```
+
+Run metadata: `seed=20260910`, `scenario_generation=seeded_random_v1`,
+`repetitions=2`, `scenario_count=10`, and repair disabled. The four malformed
+requests were therefore expected to remain blocked; this is the baseline to
+compare against a run with a real repair model configured.
+
+| Metric | Value |
+|---|---:|
+| scenario_count | 10 |
+| pass_rate | 0.60 |
+| malformed_scenario_count | 4 |
+| malformed_repaired_count | 0 |
+| policy_gate_accuracy_percent | 100.0 |
+| sandbox_escape_attempts_blocked | 2 / 2 |
+| latency_mean_ms | 1026.07 |
+| latency_p50_ms | 1017.49 |
+| latency_p95_ms | 2044.02 |
+
+These values are a real local Redis/OPA/sandbox measurement from one host, not
+a claim about distributed production throughput. Re-run the command to produce
+a new `eval/realistic-results.json`; include the seed and configuration when
+publishing results.
 
 ## Phase 8 HTTP/Kind measurement template
 

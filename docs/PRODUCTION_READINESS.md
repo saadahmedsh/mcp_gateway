@@ -12,6 +12,7 @@ Review date: 2026-09-10
 | Rego policy tests | Pass | `opa test gateway/policy/policies` — 5/5 |
 | Offline evaluation | Pass | `make eval` — 7/7 scenarios |
 | Live MCP evaluation | Pass | `make eval-live` — 7/7 scenarios |
+| Generated realistic benchmark | Pass | `eval.realistic` — seeded 10-scenario local run |
 | Gateway image | Pass | Multi-stage build, non-root user, healthcheck |
 | Helm chart | Pass | `helm lint` and `helm template` |
 | HTTP entrypoint | Partial | Streamable HTTP app and bearer-token staging guard |
