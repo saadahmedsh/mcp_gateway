@@ -346,7 +346,10 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
         if active_settings.environment == "test"
         else OpaPolicyClient(str(active_settings.opa_url))
     )
-    approval_queue = RedisApprovalQueue(str(active_settings.redis_url))
+    approval_queue = RedisApprovalQueue(
+        str(active_settings.redis_url),
+        ttl_seconds=active_settings.state_ttl_seconds,
+    )
     session_id = uuid4().hex
     registry = create_registry(active_settings)
 

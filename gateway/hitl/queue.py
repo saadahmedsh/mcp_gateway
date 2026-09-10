@@ -40,11 +40,17 @@ class ApprovalQueue(Protocol):
 class RedisApprovalQueue:
     """Store approval requests and decisions in Redis JSON values."""
 
-    def __init__(self, redis_url: str, poll_interval_seconds: float = 0.2) -> None:
+    def __init__(
+        self,
+        redis_url: str,
+        poll_interval_seconds: float = 0.2,
+        ttl_seconds: int = 86_400,
+    ) -> None:
         """Create a queue using the configured Redis connection."""
 
         self._client: Redis = Redis.from_url(redis_url, decode_responses=True)
         self._poll_interval = poll_interval_seconds
+        self._ttl_seconds = ttl_seconds
 
     @staticmethod
     def _key(approval_id: str) -> str:
@@ -57,7 +63,9 @@ class RedisApprovalQueue:
 
         try:
             await self._client.set(
-                self._key(request.approval_id), request.model_dump_json()
+                self._key(request.approval_id),
+                request.model_dump_json(),
+                ex=self._ttl_seconds,
             )
         except (RedisError, OSError) as error:
             raise StateStoreUnavailableError() from error
@@ -104,7 +112,11 @@ class RedisApprovalQueue:
                     "reason": reason,
                 }
             )
-            await self._client.set(self._key(approval_id), updated.model_dump_json())
+            await self._client.set(
+                self._key(approval_id),
+                updated.model_dump_json(),
+                ex=self._ttl_seconds,
+            )
         except ApprovalTimeoutError:
             raise
         except (RedisError, OSError) as error:

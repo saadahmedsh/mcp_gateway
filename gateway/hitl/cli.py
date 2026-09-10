@@ -11,7 +11,10 @@ async def _run() -> None:
     """List pending requests and resolve one selected by the operator."""
 
     settings = get_settings()
-    queue = RedisApprovalQueue(str(settings.redis_url))
+    queue = RedisApprovalQueue(
+        str(settings.redis_url),
+        ttl_seconds=settings.state_ttl_seconds,
+    )
     try:
         pending = await queue.list_pending()
         for request in pending:
@@ -39,3 +42,7 @@ def main() -> None:
     """Run the approval CLI."""
 
     asyncio.run(_run())
+
+
+if __name__ == "__main__":
+    main()

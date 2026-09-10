@@ -1,6 +1,7 @@
 """Minimal end-to-end MCP client for the Phase 1 demo."""
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -23,8 +24,11 @@ class DemoReport(BaseModel):
 async def run_demo(database_path: Path | None = None) -> DemoReport:
     """Start the gateway, discover tools, and exercise both Phase 1 paths."""
 
-    environment = {}
-    environment["GATEWAY_APPROVAL_TIMEOUT_SECONDS"] = "1"
+    environment = {
+        "GATEWAY_APPROVAL_TIMEOUT_SECONDS": os.environ.get(
+            "GATEWAY_APPROVAL_TIMEOUT_SECONDS", "300"
+        )
+    }
     if database_path is not None:
         environment["GATEWAY_DATABASE_PATH"] = str(database_path)
 
