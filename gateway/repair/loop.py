@@ -61,7 +61,7 @@ class RepairLoop:
         while True:
             try:
                 return await executor(current), attempt
-            except BaseException as error:
+            except Exception as error:
                 diagnosis = diagnose(error)
                 if not self._can_retry(diagnosis, context, attempt, started):
                     if (

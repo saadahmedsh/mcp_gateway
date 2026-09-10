@@ -1,5 +1,6 @@
 """Tests for bounded failure diagnosis and self-healing retries."""
 
+import asyncio
 from collections.abc import Mapping
 from random import Random
 from typing import Any
@@ -95,6 +96,22 @@ async def test_non_idempotent_mutation_needs_review() -> None:
 
     with pytest.raises(NeedsReviewError, match="needs review"):
         await RepairLoop().run({}, execute, RepairContext(RiskClass.MUTATING))
+
+
+@pytest.mark.asyncio
+async def test_cancellation_is_not_retried() -> None:
+    """Propagate task cancellation instead of treating it as a tool failure."""
+
+    attempts = 0
+
+    async def execute(_arguments: Mapping[str, Any]) -> str:
+        nonlocal attempts
+        attempts += 1
+        raise asyncio.CancelledError()
+
+    with pytest.raises(asyncio.CancelledError):
+        await RepairLoop().run({}, execute, RepairContext(RiskClass.READ_ONLY))
+    assert attempts == 1
 
 
 def test_backoff_is_bounded_and_deterministic() -> None:

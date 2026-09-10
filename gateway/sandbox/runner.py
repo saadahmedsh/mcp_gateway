@@ -147,15 +147,21 @@ class SandboxRunner:
             if process is not None and process.returncode is None:
                 process.kill()
                 await process.wait()
-            cleanup = await asyncio.create_subprocess_exec(
-                "docker",
-                "rm",
-                "-f",
-                container_name,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-            )
-            await cleanup.wait()
+            try:
+                cleanup = await asyncio.create_subprocess_exec(
+                    "docker",
+                    "rm",
+                    "-f",
+                    container_name,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+                await cleanup.wait()
+            except OSError:
+                self._logger.warning(
+                    "sandbox_cleanup_unavailable",
+                    container_name=container_name,
+                )
 
     async def run_worker(
         self,

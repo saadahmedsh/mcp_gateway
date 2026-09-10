@@ -1,0 +1,16 @@
+.git
+.venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+data
+tests
+docs
+deploy
+eval/results.json
+eval/live-results.json
+.env
+.env.*
+!.env.example

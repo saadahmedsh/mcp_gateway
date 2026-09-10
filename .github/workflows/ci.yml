@@ -21,11 +21,17 @@ jobs:
       - name: Run tests
         run: make test
       - name: Test policy bundle
-        uses: openpolicyagent/setup-opa@v2
+        uses: open-policy-agent/setup-opa@v2
         with:
           version: latest
       - name: Run Rego tests
         run: opa test gateway/policy/policies
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+      - name: Validate Helm chart
+        run: |
+          helm lint deploy/helm/mcp-gateway
+          helm template gateway deploy/helm/mcp-gateway >/dev/null
       - name: Run deterministic evaluation smoke test
         run: make eval
       - name: Build gateway image

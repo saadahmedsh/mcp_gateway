@@ -3,12 +3,11 @@
 A security and reliability control plane between LLM agents and the tools they
 invoke through the Model Context Protocol (MCP).
 
-> **Project status:** Phase 6 audit logging and evaluation are implemented on
-> top of the Phase 5 repair loop and Phase 4 sandbox path. gVisor host
-> validation is still pending. A real MCP client can discover tools and execute
-> calls while the gateway persists lifecycle state, emits traces, evaluates
-> every live call through fail-closed OPA policy, and writes hash-chained audit
-> records. See [PLAN.md](PLAN.md).
+> **Project status:** Phases 0–7 are implemented, including audit logging,
+> evaluation, packaging, Helm, and CI. The current MCP transport is stdio and
+> gVisor host validation is still pending. The known deployment limitations
+> below must be addressed before connecting this repository to production
+> systems. See [PLAN.md](PLAN.md).
 
 ## Why this project exists
 
@@ -62,7 +61,7 @@ SQLite query runner │ shell executor │ Git workspace
 | 4 | gVisor and hardened-Docker execution | In progress |
 | 5 | Bounded repair and retry orchestration | Implemented |
 | 6 | Hash-chained audit and evaluation harness | Implemented |
-| 7 | Container packaging, Helm, and CI | Planned |
+| 7 | Container packaging, Helm, and CI | Implemented |
 
 Phase 2 records each call as `received`, `validated`, `policy_checked`,
 `executing`, and a terminal state. It creates a root `tool_call` span plus
@@ -240,7 +239,7 @@ by Git; `.env.example` contains safe defaults.
 | `GATEWAY_SANDBOX_RUNTIME` | `hardened-docker` | `hardened-docker` or `gvisor` |
 | `GATEWAY_SANDBOX_IMAGE` | `mcp-gateway-tool:local` | Tool image used for isolated calls |
 | `GATEWAY_SANDBOX_OUTPUT_LIMIT_BYTES` | `1048576` | Maximum combined stream size per stream |
-| `GATEWAY_AUDIT_LOG_PATH` | `data/audit.jsonl` | Future audit destination |
+| `GATEWAY_AUDIT_LOG_PATH` | `data/audit.jsonl` | Hash-chained audit destination |
 
 Never commit `.env`, credentials, tokens, private keys, or production data.
 
@@ -264,6 +263,9 @@ Never commit `.env`, credentials, tokens, private keys, or production data.
 The current deployment chart uses the stdio server with exec-based health
 probes. A network-facing MCP transport, external secret manager, HA Redis/OPA,
 and durable remote audit sink are deliberate follow-up improvements.
+
+See the full release gate and evidence in
+[docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md).
 
 ### Inspect Phase 2 state and traces
 
