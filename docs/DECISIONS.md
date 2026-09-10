@@ -131,3 +131,36 @@ from later phases will be added only when those phases begin.
   for diagnostics and remains easy to collect in containers.
 - **Rejected:** Human-readable logs or stdout logging, because either breaks
   machine parsing or corrupts the stdio protocol.
+
+## ADR-0013: Make OPA the only policy authority
+
+- **Status:** Accepted in Phase 3
+- **Decision:** Send the declared risk class and validated arguments to OPA for
+  every live call. Any transport, HTTP, or malformed-response failure is a
+  typed denial.
+- **Reason:** Tool metadata is only a hint; pattern rules must detect a
+  destructive request disguised as read-only input.
+- **Rejected:** Local Python heuristics as a second authority, because two
+  implementations could disagree and create an unsafe fail-open path.
+
+## ADR-0014: Approval is an explicit Redis state transition
+
+- **Status:** Accepted in Phase 3
+- **Decision:** Persist the full policy input and matched rule before waiting in
+  `awaiting_approval`. The CLI records approver identity and a mandatory reason;
+  timeout and rejection become `denied`.
+- **Reason:** Operators need a reviewable command and a durable decision that
+  survives process boundaries.
+- **Rejected:** In-process callbacks, because they cannot support a separate
+  approver process or gateway restart.
+
+## ADR-0015: Keep the Phase 1 database physically read-only
+
+- **Status:** Reaffirmed in Phase 3
+- **Decision:** Policy detects and gates destructive SQL, but the existing
+  `db_query` executor still rejects writes. A write-capable tool will only be
+  introduced together with sandboxing and the complete policy path.
+- **Reason:** Approval authorizes intent; it must not weaken the independent
+  executor boundary.
+- **Rejected:** Removing SQLite authorizer protections to make `DELETE` execute,
+  because that would violate the Phase 1 security boundary.

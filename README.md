@@ -3,11 +3,13 @@
 A security and reliability control plane between LLM agents and the tools they
 invoke through the Model Context Protocol (MCP).
 
-> **Project status:** Phase 2 is implemented. A real MCP client can discover
-> tools and execute calls while the gateway persists lifecycle state in Redis,
-> emits OpenTelemetry traces, and writes structured JSON logs. Policy
-> enforcement, sandboxing, repair, and the audit chain remain planned
-> capabilities. See [PLAN.md](PLAN.md) for the authoritative delivery plan.
+> **Project status:** Phase 3 policy and approval enforcement is implemented.
+> One write-capable executor criterion remains intentionally deferred. A real
+> MCP client can discover
+> tools and execute calls while the gateway persists lifecycle state, emits
+> traces, and evaluates every live call through fail-closed OPA policy. Mutating
+> and destructive calls pause for explicit CLI approval. Sandboxing, repair,
+> and the audit chain remain planned capabilities. See [PLAN.md](PLAN.md).
 
 ## Why this project exists
 
@@ -56,8 +58,8 @@ SQLite query runner │ shell executor │ Git workspace
 |---:|---|---|
 | 0 | Environment and repository skeleton | Complete |
 | 1 | MCP server, registry, and database query tool | Complete |
-| 2 | Redis lifecycle state and OpenTelemetry tracing | Implemented |
-| 3 | OPA policy enforcement and human approval | Planned |
+| 2 | Redis lifecycle state and OpenTelemetry tracing | Complete |
+| 3 | OPA policy enforcement and human approval | In progress |
 | 4 | gVisor and hardened-Docker execution | Planned |
 | 5 | Bounded repair and retry orchestration | Planned |
 | 6 | Hash-chained audit and evaluation harness | Planned |
@@ -68,6 +70,11 @@ Phase 2 records each call as `received`, `validated`, `policy_checked`,
 `validate`, `policy`, `sandbox`, and `execute` child spans. The policy and
 sandbox spans are observability boundaries for the phases that implement those
 controls.
+
+Phase 3 evaluates the declared risk class and the actual arguments. A policy
+denial never reaches tool execution. A `requires_approval` result is stored in
+Redis and waits for an operator decision from the CLI; rejection or timeout
+transitions the call to `denied`.
 
 ## Quick start
 
@@ -118,8 +125,20 @@ Published ports bind to `127.0.0.1` and are not exposed to the local network by
 default.
 
 `make demo` also starts a temporary stdio MCP server, discovers both registered
-tools, runs a parameterized `db_query`, and confirms that `shell_exec` refuses to
-run before Phase 4 sandboxing. The client emits one machine-readable JSON report.
+tools, runs a parameterized `db_query`, and confirms that `shell_exec` is denied
+when no approval arrives. The demo sets a one-second approval timeout so it
+never blocks. The client emits one machine-readable JSON report.
+
+To approve a real pending call, use a second terminal while the gateway is
+waiting:
+
+```bash
+.venv/bin/python -m gateway.hitl.cli <approval-id> approve \
+  --approver operator --reason "Verified maintenance request"
+```
+
+The CLI first lists pending requests. Rejection uses `reject` and also requires
+an explicit reason.
 
 To run only the MCP demonstration:
 
@@ -171,7 +190,7 @@ by Git; `.env.example` contains safe defaults.
 | `GATEWAY_OTLP_ENDPOINT` | `http://localhost:4317` | OTLP exporter target |
 | `GATEWAY_JAEGER_UI_URL` | `http://localhost:16686` | Jaeger UI |
 | `GATEWAY_DATABASE_PATH` | `data/gateway.sqlite` | Synthetic SQLite database |
-| `GATEWAY_APPROVAL_TIMEOUT_SECONDS` | `300` | Future HITL timeout |
+| `GATEWAY_APPROVAL_TIMEOUT_SECONDS` | `300` | Human approval timeout |
 | `GATEWAY_SANDBOX_RUNTIME` | `hardened-docker` | Future sandbox runtime |
 | `GATEWAY_AUDIT_LOG_PATH` | `data/audit.jsonl` | Future audit destination |
 
@@ -214,10 +233,10 @@ will fail closed when policy evaluation is unavailable and will never rewrite a
 denied request to evade policy. Tool execution will receive restrictive resource,
 filesystem, capability, process, and network limits.
 
-Those are **target guarantees, not current Phase 2 guarantees**. Phase 2 adds
-state persistence and observability, while Phase 1 provides Pydantic validation
-and a physically read-only SQLite connection. The formal threat model and
-executable isolation tests arrive in Phase 4. Until then, do not
+Those are **target guarantees, not current Phase 3 guarantees**. Phase 3 adds
+deterministic policy and human approval, while the database tool remains
+physically read-only until sandboxed execution is implemented. The formal threat
+model and executable isolation tests arrive in Phase 4. Until then, do not
 connect this repository to untrusted agents or grant it access to production
 systems.
 

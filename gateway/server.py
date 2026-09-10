@@ -14,7 +14,19 @@ from mcp.server.stdio import stdio_server
 
 from gateway import __version__
 from gateway.config import Settings, get_settings
-from gateway.errors import GatewayError, StateStoreUnavailableError, ToolExecutionError
+from gateway.errors import (
+    ApprovalRejectedError,
+    ApprovalTimeoutError,
+    GatewayError,
+    PolicyDeniedError,
+    StateStoreUnavailableError,
+    ToolExecutionError,
+)
+from gateway.hitl.queue import (
+    ApprovalQueue,
+    RedisApprovalQueue,
+    create_approval_request,
+)
 from gateway.models import (
     AttemptRecord,
     RiskClass,
@@ -22,6 +34,12 @@ from gateway.models import (
     ToolCallRecord,
     ToolCallState,
 )
+from gateway.policy.client import (
+    AllowAllPolicyClient,
+    OpaPolicyClient,
+    PolicyClient,
+)
+from gateway.policy.decisions import ALLOW, REQUIRES_APPROVAL
 from gateway.registry import ToolDefinition, ToolRegistry
 from gateway.state.redis_store import (
     InMemoryStateStore,
@@ -92,9 +110,13 @@ async def execute_tool_call(
     tracing: TracingManager,
     session_id: str,
     params: types.CallToolRequestParams,
+    policy_client: PolicyClient | None = None,
+    approval_queue: ApprovalQueue | None = None,
+    approval_timeout_seconds: float = 300.0,
 ) -> types.CallToolResult:
     """Run one request through state persistence, tracing, and tool execution."""
 
+    active_policy_client = policy_client or AllowAllPolicyClient()
     call_id = uuid4().hex
     tool_name = params.name
     definition: ToolDefinition[Any, Any] | None = None
@@ -145,10 +167,24 @@ async def execute_tool_call(
             """Persist a failed state and return its structured client response."""
 
             try:
-                await state_store.transition(
-                    call_id, ToolCallState.FAILED, error=str(error)
+                terminal_state = (
+                    ToolCallState.DENIED
+                    if error.response.error.code
+                    in {
+                        "policy_denied",
+                        "policy_unavailable",
+                        "approval_timeout",
+                        "approval_rejected",
+                    }
+                    else ToolCallState.FAILED
                 )
-                await state_store.finish_attempt(call_id, 1, "failed", error=str(error))
+                await state_store.transition(call_id, terminal_state, error=str(error))
+                await state_store.finish_attempt(
+                    call_id,
+                    1,
+                    "denied" if terminal_state is ToolCallState.DENIED else "failed",
+                    error=str(error),
+                )
             except StateStoreUnavailableError as state_error:
                 return _tool_result(
                     state_error.response.model_dump(mode="json"), is_error=True
@@ -168,8 +204,56 @@ async def execute_tool_call(
                 "policy",
                 {"tool_name": tool_name, "attempt": 1, "decision": "not_evaluated"},
             ) as policy_span:
-                policy_span.set_attribute("decision", "not_evaluated")
+                active_definition = registry.get(tool_name)
+                policy_input = {
+                    "tool_name": tool_name,
+                    "risk_class": active_definition.risk_class.value,
+                    "arguments": request.model_dump(mode="json"),
+                }
+                decision = await active_policy_client.evaluate(policy_input)
+                policy_span.set_attribute("decision", decision.outcome)
+                policy_span.set_attribute("matched_rule", decision.matched_rule)
                 await state_store.transition(call_id, ToolCallState.POLICY_CHECKED)
+
+                if decision.outcome == REQUIRES_APPROVAL:
+                    if approval_queue is None:
+                        raise PolicyDeniedError(
+                            "Approval is required but no approval queue is configured"
+                        )
+                    approval = create_approval_request(
+                        call_id,
+                        tool_name,
+                        request.model_dump(mode="json"),
+                        policy_input,
+                        decision.matched_rule,
+                    )
+                    await state_store.transition(
+                        call_id, ToolCallState.AWAITING_APPROVAL
+                    )
+                    await approval_queue.submit(approval)
+                    try:
+                        resolved = await approval_queue.wait(
+                            approval.approval_id, approval_timeout_seconds
+                        )
+                    except (ApprovalTimeoutError, ApprovalRejectedError):
+                        await state_store.transition(
+                            call_id, ToolCallState.DENIED, error=decision.reason
+                        )
+                        await state_store.finish_attempt(
+                            call_id, 1, "denied", error=decision.reason
+                        )
+                        raise
+                    policy_span.set_attribute(
+                        "approver", resolved.approver or "unknown"
+                    )
+                elif decision.outcome != ALLOW:
+                    await state_store.transition(
+                        call_id, ToolCallState.DENIED, error=decision.reason
+                    )
+                    await state_store.finish_attempt(
+                        call_id, 1, "denied", error=decision.reason
+                    )
+                    raise PolicyDeniedError(decision.reason)
 
             with tracing.span(
                 "sandbox",
@@ -197,12 +281,16 @@ def create_mcp_server(
     state_store: StateStore | None = None,
     tracing: TracingManager | None = None,
     session_id: str | None = None,
+    policy_client: PolicyClient | None = None,
+    approval_queue: ApprovalQueue | None = None,
+    approval_timeout_seconds: float = 300.0,
 ) -> Server[dict[str, Any]]:
     """Create the official MCP protocol adapter around the gateway runtime."""
 
     active_state_store = state_store or InMemoryStateStore()
     active_tracing = tracing or create_tracing()
     active_session_id = session_id or uuid4().hex
+    active_policy_client = policy_client or AllowAllPolicyClient()
 
     async def list_tools(
         _context: ServerRequestContext[dict[str, Any]],
@@ -226,6 +314,9 @@ def create_mcp_server(
             active_tracing,
             active_session_id,
             params,
+            active_policy_client,
+            approval_queue,
+            approval_timeout_seconds,
         )
 
     return Server(
@@ -250,6 +341,12 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
         active_settings.state_ttl_seconds,
     )
     tracing = create_tracing(str(active_settings.otlp_endpoint))
+    policy_client: PolicyClient = (
+        AllowAllPolicyClient()
+        if active_settings.environment == "test"
+        else OpaPolicyClient(str(active_settings.opa_url))
+    )
+    approval_queue = RedisApprovalQueue(str(active_settings.redis_url))
     session_id = uuid4().hex
     registry = create_registry(active_settings)
 
@@ -258,6 +355,9 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
         state_store=state_store,
         tracing=tracing,
         session_id=session_id,
+        policy_client=policy_client,
+        approval_queue=approval_queue,
+        approval_timeout_seconds=active_settings.approval_timeout_seconds,
     )
     try:
         async with stdio_server() as (read_stream, write_stream):
@@ -268,6 +368,7 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
             )
     finally:
         await state_store.close()
+        await approval_queue.close()
         tracing.force_flush()
         tracing.shutdown()
 

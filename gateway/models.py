@@ -68,6 +68,29 @@ class ToolCallRecord(StrictModel):
     updated_at: datetime
 
 
+class PolicyDecision(StrictModel):
+    """Deterministic policy result returned by OPA."""
+
+    outcome: str
+    matched_rule: str
+    reason: str
+
+
+class ApprovalRequest(StrictModel):
+    """Pending human approval request stored by the gateway."""
+
+    approval_id: str
+    call_id: str
+    tool_name: str
+    arguments: dict[str, Any]
+    policy_input: dict[str, Any]
+    matched_rule: str
+    created_at: datetime
+    decision: str | None = None
+    approver: str | None = None
+    reason: str | None = None
+
+
 class ErrorIssue(StrictModel):
     """One machine-readable validation issue."""
 

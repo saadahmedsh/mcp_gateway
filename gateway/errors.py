@@ -84,3 +84,39 @@ class StateStoreUnavailableError(GatewayError):
             "state_store_unavailable",
             "The gateway could not persist tool-call state",
         )
+
+
+class PolicyDeniedError(GatewayError):
+    """Raised when deterministic policy denies a tool call."""
+
+    def __init__(self, reason: str) -> None:
+        """Initialize a policy denial with its rule explanation."""
+
+        super().__init__("policy_denied", reason)
+
+
+class PolicyUnavailableError(GatewayError):
+    """Raised when OPA cannot evaluate a policy request."""
+
+    def __init__(self) -> None:
+        """Initialize a fail-closed policy error."""
+
+        super().__init__("policy_unavailable", "Policy evaluation is unavailable")
+
+
+class ApprovalTimeoutError(GatewayError):
+    """Raised when an approval request expires without a decision."""
+
+    def __init__(self) -> None:
+        """Initialize an approval timeout denial."""
+
+        super().__init__("approval_timeout", "Approval timed out; the call was denied")
+
+
+class ApprovalRejectedError(GatewayError):
+    """Raised when an operator rejects a pending call."""
+
+    def __init__(self, reason: str) -> None:
+        """Initialize an operator rejection."""
+
+        super().__init__("approval_rejected", reason)
