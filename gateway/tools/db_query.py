@@ -1,6 +1,5 @@
 """Read-only, parameterized SQL execution against synthetic SQLite data."""
 
-import asyncio
 import sqlite3
 from collections.abc import Sequence
 from pathlib import Path
@@ -8,6 +7,7 @@ from typing import TYPE_CHECKING, TypeAlias
 
 from pydantic import Field
 
+from gateway.async_utils import run_blocking
 from gateway.errors import ToolExecutionError
 from gateway.models import RiskClass, StrictModel
 from gateway.registry import ToolDefinition
@@ -104,7 +104,7 @@ def _seed_database(database_path: Path) -> None:
 async def seed_database(database_path: Path) -> None:
     """Create the deterministic synthetic database without blocking the event loop."""
 
-    await asyncio.to_thread(_seed_database, database_path)
+    await run_blocking(_seed_database, database_path)
 
 
 def _read_only_authorizer(
@@ -165,7 +165,7 @@ def _execute_query(database_path: Path, request: DbQueryInput) -> DbQueryOutput:
 async def query_database(database_path: Path, request: DbQueryInput) -> DbQueryOutput:
     """Execute a read-only query without blocking the async request path."""
 
-    return await asyncio.to_thread(_execute_query, database_path, request)
+    return await run_blocking(_execute_query, database_path, request)
 
 
 def create_db_query_tool(

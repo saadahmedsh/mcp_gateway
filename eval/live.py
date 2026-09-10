@@ -12,6 +12,7 @@ from typing import Any
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
+from gateway.async_utils import run_blocking
 from eval.harness import _load_scenarios
 
 
@@ -106,7 +107,7 @@ async def run_live_evaluation(
         "latency_mean_ms": statistics.mean(latencies) if latencies else 0.0,
     }
     report = {"metrics": metrics, "results": results}
-    await asyncio.to_thread(_write_report, output_path, report)
+    await run_blocking(_write_report, output_path, report)
     return report
 
 

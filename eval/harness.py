@@ -9,6 +9,7 @@ from typing import Any
 
 from mcp import types
 
+from gateway.async_utils import run_blocking
 from gateway.config import Settings
 from gateway.models import PolicyDecision
 from gateway.policy.decisions import ALLOW, DENY
@@ -139,7 +140,7 @@ async def run_evaluation(
         "malformed_scenarios": len(malformed),
     }
     report = {"metrics": metrics, "results": results}
-    await asyncio.to_thread(_write_json, output_path, report)
+    await run_blocking(_write_json, output_path, report)
     return report
 
 

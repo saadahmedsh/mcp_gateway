@@ -14,6 +14,7 @@ from typing import Any
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
+from gateway.async_utils import run_blocking
 from eval.scenario_generator import generate_scenarios
 from gateway.config import Settings
 
@@ -180,7 +181,7 @@ async def run_realistic_evaluation(
         },
         "results": results,
     }
-    await asyncio.to_thread(_write_report, output_path, report)
+    await run_blocking(_write_report, output_path, report)
     return report
 
 

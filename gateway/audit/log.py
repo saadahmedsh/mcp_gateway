@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from gateway.async_utils import run_blocking
 from gateway.models import AttemptRecord, AuditRecord, Principal, RepairAttemptRecord
 
 _GENESIS_HASH = "0" * 64
@@ -125,4 +126,4 @@ class AuditLogger:
         if timestamp is not None:
             fields["timestamp"] = timestamp
         async with self._lock:
-            return await asyncio.to_thread(self._append_sync, fields)
+            return await run_blocking(self._append_sync, fields)
