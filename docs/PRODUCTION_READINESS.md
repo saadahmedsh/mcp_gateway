@@ -14,6 +14,8 @@ Review date: 2026-09-10
 | Live MCP evaluation | Pass | `make eval-live` — 7/7 scenarios |
 | Gateway image | Pass | Multi-stage build, non-root user, healthcheck |
 | Helm chart | Pass | `helm lint` and `helm template` |
+| HTTP entrypoint | Partial | Streamable HTTP app and bearer-token staging guard |
+| Kind deployment | Not run | Requires local Kind installation and dependency overlay |
 | Demo path | Pass | `make demo` |
 
 ## Release blockers
@@ -46,9 +48,13 @@ These items should be resolved before production traffic is permitted:
 - Add reconciliation and idempotency keys for each mutating tool.
 - Replicate audit records and add key rotation for audit-chain verification.
 - Replace single-node SQLite with a managed data service for real workloads.
+- Replace the staging bearer token with OIDC or mTLS and configure ingress TLS.
+- Add a Kind dependency overlay so HTTP readiness can be tested without host
+  networking assumptions.
 
 ## Decision
 
 The repository is suitable for review, local demonstrations, CI, and controlled
-staging. It is not production-deployable until the release blockers above are
-closed.
+staging. Phase 8 has started with the HTTP transport, health endpoints, and Kind
+packaging, but it is not production-deployable until the release blockers above
+are closed.

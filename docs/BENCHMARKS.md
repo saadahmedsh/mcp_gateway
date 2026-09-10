@@ -12,6 +12,21 @@ hyperfine --runs 10 --warmup 2 \
 Record separate gVisor and hardened-Docker results here only after running the
 command on the target WSL2 host. No numbers are estimated in source control.
 
+## Measurement boundaries
+
+The offline harness measures deterministic dispatcher behavior with in-memory
+state and a local policy adapter. It does not measure MCP network transport,
+Redis/OPA round trips, OTLP export, or Kubernetes scheduling.
+
+The live harness measures the real MCP stdio transport, Redis, OPA, and the
+configured Docker sandbox. It remains a single-host smoke test rather than a
+multi-node throughput or availability benchmark.
+
+Phase 8 adds HTTP and Kind deployment smoke checks but does not yet provide
+production latency numbers. Those require a running Kind or cloud staging
+cluster and must record the cluster, runtime, image digest, concurrency, and
+dependency configuration.
+
 ## Phase 4 local smoke measurement
 
 On the development Docker host, five cold `docker run` invocations of the
@@ -59,3 +74,19 @@ Redis, OPA, and the configured sandbox runtime. A development-host run on
 Re-run `make eval-live` to regenerate `eval/live-results.json`; latency varies
 with Docker startup and host load. Approval scenarios intentionally use a
 two-second timeout so unattended evaluations cannot block indefinitely.
+
+## Phase 8 HTTP/Kind measurement template
+
+Populate this section only after running the HTTP gateway through a Kind
+Service. Commit the command and environment alongside the result.
+
+| Metric | Value | Environment |
+|---|---:|---|
+| HTTP MCP requests | pending | Kind cluster and image digest pending |
+| HTTP p50 latency | pending | concurrency and scenario pending |
+| HTTP p95 latency | pending | concurrency and scenario pending |
+| `/livez` success rate | pending | test window pending |
+| `/readyz` dependency-failure behavior | pending | Redis/OPA outage test pending |
+
+Do not replace `pending` with estimates. A missing external environment is a
+measurement limitation, not a successful benchmark.

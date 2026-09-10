@@ -15,6 +15,9 @@ coverage.xml
 htmlcov/
 .idea/
 .vscode/
+*.log
+.secrets/
+.envrc
 
 
 # Python build artifacts
@@ -43,3 +46,4 @@ dist/
 # Operating-system files
 .DS_Store
 Thumbs.db
+docs/INTERVIEW_GUIDE.md

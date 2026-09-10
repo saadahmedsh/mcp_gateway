@@ -350,8 +350,4 @@ the current scope.
 - [Architecture decisions](docs/DECISIONS.md) — accepted and rejected trade-offs
 - [Threat model](docs/THREAT_MODEL.md) — Phase 4 isolation assumptions and residual risks
 - [Benchmarks](docs/BENCHMARKS.md) — generated from the Phase 6 evaluation suite
-
-## License
-
-No license has been selected. Treat the source as all rights reserved until a
-license file is added.
+- [Production readiness](docs/PRODUCTION_READINESS.md) — release blockers and hardening evidence
