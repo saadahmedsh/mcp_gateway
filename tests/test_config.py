@@ -18,6 +18,11 @@ def _clear_gateway_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "GATEWAY_OTLP_ENDPOINT",
         "GATEWAY_JAEGER_UI_URL",
         "GATEWAY_DATABASE_PATH",
+        "GATEWAY_CONTROL_PLANE_ENABLED",
+        "GATEWAY_CONTROL_PLANE_DATABASE_URL",
+        "GATEWAY_CONTROL_PLANE_POOL_SIZE",
+        "GATEWAY_CONTROL_PLANE_MAX_OVERFLOW",
+        "GATEWAY_CONTROL_PLANE_CONNECT_TIMEOUT_SECONDS",
         "GATEWAY_APPROVAL_TIMEOUT_SECONDS",
         "GATEWAY_SANDBOX_RUNTIME",
         "GATEWAY_AUDIT_LOG_PATH",
@@ -54,6 +59,8 @@ def test_settings_have_safe_local_defaults(
     assert str(settings.redis_url) == "redis://localhost:6379/0"
     assert str(settings.opa_url) == "http://localhost:8181/"
     assert settings.database_path == Path("data/gateway.sqlite")
+    assert settings.control_plane_enabled is False
+    assert settings.control_plane_database_url.startswith("postgresql+asyncpg://")
     assert settings.sandbox_runtime == "hardened-docker"
     assert settings.audit_log_path == Path("data/audit.jsonl")
     assert settings.http_host == "0.0.0.0"

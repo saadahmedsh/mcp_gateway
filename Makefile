@@ -1,7 +1,7 @@
 PYTHON ?= .venv/bin/python
 COMPOSE ?= docker compose
 
-.PHONY: up down test lint demo eval eval-live eval-realistic install sandbox-build kind-up kind-load kind-deploy kind-down
+.PHONY: up down test lint demo eval eval-live eval-realistic install sandbox-build db-migrate db-upgrade kind-up kind-load kind-deploy kind-down
 
 install:
 	$(PYTHON) -m pip install --requirement requirements.lock
@@ -11,6 +11,11 @@ sandbox-build:
 
 up: sandbox-build
 	$(COMPOSE) up --detach --wait
+
+db-migrate:
+	$(PYTHON) -m alembic upgrade head
+
+db-upgrade: db-migrate
 
 down:
 	$(COMPOSE) down

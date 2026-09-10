@@ -363,3 +363,17 @@ CLI has a portable `--runtime-flag` option.
 - **Rejected:** Performing filesystem or SQLite work directly in the event
   loop, because it would violate the async request-path boundary. Increasing
   test timeouts was also rejected because it would hide the stuck operation.
+
+## ADR-0032: Use asyncio pipes for the local MCP stdio server
+
+- **Status:** Accepted during Stage B verification
+- **Decision:** The gateway's stdio server uses asyncio's native pipe
+  transports and MCP memory streams rather than the SDK helper that wraps
+  standard files through AnyIO worker threads.
+- **Reason:** The SDK stdio helper did not deliver newline-delimited messages in
+  this Python/AnyIO environment. A minimal unmodified MCP server reproduced the
+  same behavior, while native asyncio pipe transports completed initialization
+  and clean shutdown reliably.
+- **Rejected:** Increasing MCP request timeouts or suppressing the integration
+  test, because that would hide a broken protocol boundary. Replacing stdio
+  with HTTP was also rejected because stdio remains a supported local path.

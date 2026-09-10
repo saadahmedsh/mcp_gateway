@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     otlp_endpoint: AnyHttpUrl = AnyHttpUrl("http://localhost:4317")
     jaeger_ui_url: AnyHttpUrl = AnyHttpUrl("http://localhost:16686")
     database_path: Path = Path("data/gateway.sqlite")
+    control_plane_enabled: bool = False
+    control_plane_database_url: str = (
+        "postgresql+asyncpg://gateway:gateway_local@localhost:5432/gateway"
+    )
+    control_plane_pool_size: int = 5
+    control_plane_max_overflow: int = 10
+    control_plane_connect_timeout_seconds: float = 3.0
     state_store_backend: Literal["redis", "memory"] = "redis"
     redis_operation_timeout_seconds: float = 2.0
     state_ttl_seconds: int = 86_400
