@@ -72,3 +72,15 @@ class ToolExecutionError(GatewayError):
         """Initialize an anticipated tool execution error."""
 
         super().__init__("tool_execution_failed", message)
+
+
+class StateStoreUnavailableError(GatewayError):
+    """Raised when durable call state cannot be read or written."""
+
+    def __init__(self) -> None:
+        """Initialize a safe degraded-state response."""
+
+        super().__init__(
+            "state_store_unavailable",
+            "The gateway could not persist tool-call state",
+        )

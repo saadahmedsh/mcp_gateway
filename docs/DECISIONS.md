@@ -84,3 +84,50 @@ from later phases will be added only when those phases begin.
 - **Reason:** Enabling writes in Phase 1 would contradict its explicit read-only
   requirement and expose mutations before authorization exists.
 - **Rejected:** Enabling early writes or inventing an unplanned `db_execute` tool.
+
+## ADR-0009: Use Redis as the production lifecycle state store
+
+- **Status:** Accepted in Phase 2
+- **Decision:** Store each tool-call record as JSON in Redis, maintain a
+  session index, and expire records after the configured TTL. State updates use
+  optimistic `WATCH`/`MULTI` transactions.
+- **Reason:** Redis provides the required shared state for multiple gateway
+  processes, bounded async operations, and the future approval queue without
+  introducing a second persistence abstraction.
+- **Rejected:** Process-local dictionaries for live operation, because they
+  lose state on restart and cannot coordinate workers. An SQL database was
+  deferred because it adds operational weight for short-lived coordination
+  records.
+
+## ADR-0010: Keep an in-memory state backend only for isolated tests
+
+- **Status:** Accepted in Phase 2
+- **Decision:** Support an explicit `memory` backend for unit and integration
+  tests; default deployments use Redis.
+- **Reason:** Tests remain deterministic and do not require infrastructure,
+  while the default still exercises the real production path.
+- **Rejected:** Silently falling back to memory when Redis is unavailable,
+  because losing lifecycle state would hide an operational failure.
+
+## ADR-0011: Trace the complete call lifecycle with one root and five spans
+
+- **Status:** Accepted in Phase 2
+- **Decision:** Create one root `tool_call` span and child spans named
+  `validate`, `policy`, `sandbox`, and `execute`. Export live traces through
+  OTLP/gRPC and use an in-memory exporter in tests.
+- **Reason:** A stable span shape makes later policy, sandbox, and repair work
+  visible without changing the MCP interface. The test exporter proves span
+  relationships without requiring Jaeger.
+- **Rejected:** One span per request, because it cannot show where a call
+  spent time or failed. Exporting directly to Jaeger was rejected because OTLP
+  keeps the gateway independent of the tracing backend.
+
+## ADR-0012: Keep structured logs off MCP stdout
+
+- **Status:** Accepted in Phase 2
+- **Decision:** Emit structlog JSON to stderr and bind `trace_id`, `session_id`,
+  and `tool_name` for each call.
+- **Reason:** MCP stdio reserves stdout for protocol messages; stderr is safe
+  for diagnostics and remains easy to collect in containers.
+- **Rejected:** Human-readable logs or stdout logging, because either breaks
+  machine parsing or corrupts the stdio protocol.

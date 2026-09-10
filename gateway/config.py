@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     otlp_endpoint: AnyHttpUrl = AnyHttpUrl("http://localhost:4317")
     jaeger_ui_url: AnyHttpUrl = AnyHttpUrl("http://localhost:16686")
     database_path: Path = Path("data/gateway.sqlite")
+    state_store_backend: Literal["redis", "memory"] = "redis"
+    redis_operation_timeout_seconds: float = 2.0
+    state_ttl_seconds: int = 86_400
     approval_timeout_seconds: int = 300
     sandbox_runtime: Literal["gvisor", "hardened-docker"] = "hardened-docker"
     audit_log_path: Path = Path("data/audit.jsonl")

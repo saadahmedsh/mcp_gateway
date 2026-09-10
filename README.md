@@ -3,11 +3,11 @@
 A security and reliability control plane between LLM agents and the tools they
 invoke through the Model Context Protocol (MCP).
 
-> **Project status:** Phase 1 is complete. A real MCP client can discover the
-> gateway's tools and execute read-only queries against synthetic SQLite data.
-> Policy enforcement, sandboxing, tracing, repair, and the audit chain remain
-> planned capabilities. See [PLAN.md](PLAN.md) for the authoritative delivery
-> plan.
+> **Project status:** Phase 2 is implemented. A real MCP client can discover
+> tools and execute calls while the gateway persists lifecycle state in Redis,
+> emits OpenTelemetry traces, and writes structured JSON logs. Policy
+> enforcement, sandboxing, repair, and the audit chain remain planned
+> capabilities. See [PLAN.md](PLAN.md) for the authoritative delivery plan.
 
 ## Why this project exists
 
@@ -56,15 +56,18 @@ SQLite query runner │ shell executor │ Git workspace
 |---:|---|---|
 | 0 | Environment and repository skeleton | Complete |
 | 1 | MCP server, registry, and database query tool | Complete |
-| 2 | Redis lifecycle state and OpenTelemetry tracing | Planned |
+| 2 | Redis lifecycle state and OpenTelemetry tracing | Implemented |
 | 3 | OPA policy enforcement and human approval | Planned |
 | 4 | gVisor and hardened-Docker execution | Planned |
 | 5 | Bounded repair and retry orchestration | Planned |
 | 6 | Hash-chained audit and evaluation harness | Planned |
 | 7 | Container packaging, Helm, and CI | Planned |
 
-Phase 2 and later modules exist only as package boundaries. They intentionally
-contain no speculative implementation.
+Phase 2 records each call as `received`, `validated`, `policy_checked`,
+`executing`, and a terminal state. It creates a root `tool_call` span plus
+`validate`, `policy`, `sandbox`, and `execute` child spans. The policy and
+sandbox spans are observability boundaries for the phases that implement those
+controls.
 
 ## Quick start
 
@@ -161,6 +164,9 @@ by Git; `.env.example` contains safe defaults.
 | `GATEWAY_ENVIRONMENT` | `development` | Runtime environment |
 | `GATEWAY_LOG_LEVEL` | `INFO` | Structured log threshold |
 | `GATEWAY_REDIS_URL` | `redis://localhost:6379/0` | Redis connection |
+| `GATEWAY_STATE_STORE_BACKEND` | `redis` | `redis` for live state or `memory` for isolated tests |
+| `GATEWAY_REDIS_OPERATION_TIMEOUT_SECONDS` | `2.0` | Maximum Redis operation time |
+| `GATEWAY_STATE_TTL_SECONDS` | `86400` | State record retention |
 | `GATEWAY_OPA_URL` | `http://localhost:8181` | OPA API |
 | `GATEWAY_OTLP_ENDPOINT` | `http://localhost:4317` | OTLP exporter target |
 | `GATEWAY_JAEGER_UI_URL` | `http://localhost:16686` | Jaeger UI |
@@ -170,6 +176,26 @@ by Git; `.env.example` contains safe defaults.
 | `GATEWAY_AUDIT_LOG_PATH` | `data/audit.jsonl` | Future audit destination |
 
 Never commit `.env`, credentials, tokens, private keys, or production data.
+
+### Inspect Phase 2 state and traces
+
+After `make demo`, list persisted calls and inspect one record:
+
+```bash
+docker compose exec redis redis-cli --scan --pattern 'gateway:tool_call:*'
+docker compose exec redis redis-cli GET gateway:tool_call:<call-id>
+```
+
+Open `http://localhost:16686`, select the
+`mcp-enterprise-agent-gateway` service, and inspect a trace. The Jaeger API
+provides a scriptable alternative:
+
+```bash
+curl --fail 'http://localhost:16686/api/traces?service=mcp-enterprise-agent-gateway&limit=5'
+```
+
+If Redis is unavailable, calls return a typed `state_store_unavailable` error
+within the configured timeout rather than hanging.
 
 ## Repository structure
 
@@ -188,9 +214,10 @@ will fail closed when policy evaluation is unavailable and will never rewrite a
 denied request to evade policy. Tool execution will receive restrictive resource,
 filesystem, capability, process, and network limits.
 
-Those are **target guarantees, not current Phase 1 guarantees**. Phase 1 only
-provides Pydantic validation and a physically read-only SQLite connection. The formal
-threat model and executable isolation tests arrive in Phase 4. Until then, do not
+Those are **target guarantees, not current Phase 2 guarantees**. Phase 2 adds
+state persistence and observability, while Phase 1 provides Pydantic validation
+and a physically read-only SQLite connection. The formal threat model and
+executable isolation tests arrive in Phase 4. Until then, do not
 connect this repository to untrusted agents or grant it access to production
 systems.
 

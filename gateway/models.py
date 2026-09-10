@@ -1,6 +1,8 @@
 """Shared gateway data models."""
 
+from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -17,6 +19,53 @@ class RiskClass(StrEnum):
     READ_ONLY = "read_only"
     MUTATING = "mutating"
     DESTRUCTIVE = "destructive"
+
+
+class ToolCallState(StrEnum):
+    """Lifecycle states persisted for one tool call."""
+
+    RECEIVED = "received"
+    VALIDATED = "validated"
+    POLICY_CHECKED = "policy_checked"
+    AWAITING_APPROVAL = "awaiting_approval"
+    EXECUTING = "executing"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    DENIED = "denied"
+
+
+class StateTransition(StrictModel):
+    """One timestamped lifecycle transition."""
+
+    state: ToolCallState
+    timestamp: datetime
+    error: str | None = None
+
+
+class AttemptRecord(StrictModel):
+    """Execution attempt metadata retained with a tool call."""
+
+    attempt: int
+    started_at: datetime
+    finished_at: datetime | None = None
+    outcome: str | None = None
+    error: str | None = None
+
+
+class ToolCallRecord(StrictModel):
+    """Durable state and attempt history for one tool invocation."""
+
+    call_id: str
+    trace_id: str
+    session_id: str
+    tool_name: str
+    risk_class: RiskClass | None
+    arguments: dict[str, Any]
+    current_state: ToolCallState
+    transitions: list[StateTransition]
+    attempts: list[AttemptRecord]
+    created_at: datetime
+    updated_at: datetime
 
 
 class ErrorIssue(StrictModel):

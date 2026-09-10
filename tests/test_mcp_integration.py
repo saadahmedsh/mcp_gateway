@@ -27,7 +27,10 @@ async def test_mcp_tools_end_to_end(tmp_path: Path) -> None:
         command=sys.executable,
         args=["-m", "gateway.server"],
         cwd=Path.cwd(),
-        env={"GATEWAY_DATABASE_PATH": str(tmp_path / "gateway.sqlite")},
+        env={
+            "GATEWAY_DATABASE_PATH": str(tmp_path / "gateway.sqlite"),
+            "GATEWAY_STATE_STORE_BACKEND": "memory",
+        },
     )
 
     async with stdio_client(server) as (read_stream, write_stream):

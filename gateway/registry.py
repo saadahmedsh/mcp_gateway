@@ -39,10 +39,19 @@ class ToolDefinition(Generic[InputModelT, OutputModelT]):
     async def execute(self, arguments: Mapping[str, Any]) -> OutputModelT:
         """Validate arguments, execute the handler, and validate its output."""
 
+        request = self.validate(arguments)
+        return await self.execute_validated(request)
+
+    def validate(self, arguments: Mapping[str, Any]) -> InputModelT:
+        """Validate untrusted arguments against the declared input model."""
+
         try:
-            request = self.input_model.model_validate(dict(arguments))
+            return self.input_model.model_validate(dict(arguments))
         except ValidationError as error:
             raise ToolInputError.from_validation_error(error) from error
+
+    async def execute_validated(self, request: InputModelT) -> OutputModelT:
+        """Run a previously validated request and validate its output model."""
 
         result = await self.handler(request)
         return self.output_model.model_validate(result)
@@ -81,3 +90,13 @@ class ToolRegistry:
         """Execute a registered tool through the shared validation boundary."""
 
         return await self.get(name).execute(arguments)
+
+    def validate(self, name: str, arguments: Mapping[str, Any]) -> BaseModel:
+        """Validate one tool request without invoking its handler."""
+
+        return self.get(name).validate(arguments)
+
+    async def execute_validated(self, name: str, request: BaseModel) -> BaseModel:
+        """Execute a validated request through the registered handler."""
+
+        return await self.get(name).execute_validated(request)
