@@ -44,10 +44,16 @@ spec:
               value: {{ .Values.gateway.sandboxImage | quote }}
             - name: GATEWAY_REPAIR_ENABLED
               value: {{ .Values.gateway.repairEnabled | quote }}
+            - name: GATEWAY_REPAIR_LLM_PROVIDER
+              value: {{ .Values.gateway.repairLlmProvider | quote }}
             - name: GATEWAY_REPAIR_LLM_URL
               value: {{ .Values.gateway.repairLlmUrl | quote }}
             - name: GATEWAY_REPAIR_LLM_MODEL
               value: {{ .Values.gateway.repairLlmModel | quote }}
+            - name: GATEWAY_REPAIR_LLM_ANTHROPIC_VERSION
+              value: {{ .Values.gateway.repairLlmAnthropicVersion | quote }}
+            - name: GATEWAY_REPAIR_LLM_MAX_TOKENS
+              value: {{ .Values.gateway.repairLlmMaxTokens | quote }}
             - name: GATEWAY_HTTP_HOST
               value: {{ .Values.gateway.httpHost | quote }}
             - name: GATEWAY_HTTP_PORT

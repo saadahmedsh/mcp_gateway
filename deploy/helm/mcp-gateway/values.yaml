@@ -28,9 +28,12 @@ gateway:
   sandboxRuntime: hardened-docker
   sandboxImage: mcp-gateway-tool:local
   repairEnabled: false
+  repairLlmProvider: openai_compatible
   repairLlmUrl: http://repair-service/v1/chat/completions
   repairLlmModel: repair-model
   repairLlmApiKey: ""
+  repairLlmAnthropicVersion: 2023-06-01
+  repairLlmMaxTokens: "1024"
   httpHost: 0.0.0.0
   httpPort: "8080"
   httpPath: /mcp

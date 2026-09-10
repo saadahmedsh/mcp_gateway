@@ -51,6 +51,9 @@ kind-load: kind-up
 	kind load docker-image mcp-gateway:kind --name mcp-gateway
 
 kind-deploy: kind-load
+	kubectl apply --filename docker/kind-dependencies.yaml
+	kubectl rollout status deployment/redis --timeout=120s
+	kubectl rollout status deployment/opa --timeout=120s
 	helm upgrade --install mcp-gateway deploy/helm/mcp-gateway \
 		--set image.repository=mcp-gateway \
 		--set image.tag=kind \

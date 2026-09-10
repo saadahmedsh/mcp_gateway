@@ -87,31 +87,33 @@ The following run used `eval.realistic` with a seeded generator rather than the
 checked-in seven-scenario corpus:
 
 ```bash
-.venv/bin/python -m eval.realistic --seed 20260910 --repetitions 2
+.venv/bin/python -m eval.realistic --seed 20260910 --repetitions 20
 ```
 
 Run metadata: `seed=20260910`, `scenario_generation=seeded_random_v1`,
-`repetitions=2`, `scenario_count=10`, and repair disabled. The four malformed
-requests were therefore expected to remain blocked; this is the baseline to
-compare against a run with a real repair model configured.
+`repetitions=20`, `scenario_count=100`, repair enabled, provider `anthropic`,
+and model `claude-sonnet-4-6`. The API key was loaded from the untracked local
+environment and is not present in this document or the JSON report.
 
 | Metric | Value |
 |---|---:|
-| scenario_count | 10 |
-| pass_rate | 0.60 |
-| malformed_scenario_count | 4 |
-| malformed_repaired_count | 0 |
+| scenario_count | 100 |
+| pass_rate | 0.87 |
+| malformed_scenario_count | 40 |
+| malformed_repaired_count | 27 / 40 (67.5%) |
 | policy_gate_accuracy_percent | 100.0 |
-| sandbox_escape_attempts_blocked | 2 / 2 |
-| latency_mean_ms | 997.55 |
-| latency_p50_ms | 872.26 |
-| latency_p95_ms | 2053.43 |
+| sandbox_escape_attempts_blocked | 20 / 20 |
+| latency_mean_ms | 2720.01 |
+| latency_p50_ms | 2043.86 |
+| latency_p95_ms | 5812.61 |
 | mean_attempts_to_success | 1.0 |
 
 These values are a real local Redis/OPA/sandbox measurement from one host, not
-a claim about distributed production throughput. Re-run the command to produce
-a new `eval/realistic-results.json`; include the seed and configuration when
-publishing results.
+a claim about distributed production throughput. The malformed repair rate is
+specific to this 40-case sample and the named model; it is not a universal model
+quality guarantee. Re-run the command to produce a new
+`eval/realistic-results.json`; include the seed and configuration when publishing
+results.
 
 ### Generated-run category breakdown
 
@@ -122,10 +124,10 @@ only when repair is enabled.
 
 | Category | Ran | Passed | Failed | Pass meaning |
 |---|---:|---:|---:|---|
-| valid | 2 | 2 | 0 | Query executed successfully |
-| malformed | 4 | 0 | 4 | Arguments repaired and then executed |
-| destructive | 2 | 2 | 0 | Destructive SQL was blocked |
-| adversarial | 2 | 2 | 0 | Host/network escape was blocked |
+| valid | 20 | 20 | 0 | Query executed successfully |
+| malformed | 40 | 27 | 13 | Arguments repaired and then executed |
+| destructive | 20 | 20 | 0 | Destructive SQL was blocked |
+| adversarial | 20 | 20 | 0 | Host/network escape was blocked |
 
 The overall `0.60` pass rate is therefore not a security failure. It is the
 correct baseline for a run with repair disabled: `6 / 10` scenarios met their
