@@ -3,12 +3,15 @@
 A security and reliability control plane between LLM agents and the tools they
 invoke through the Model Context Protocol (MCP).
 
-> **Project status:** Phases 0–7 are implemented, including audit logging,
-> evaluation, packaging, Helm, and CI. An authenticated Streamable HTTP
-> entrypoint is now available for Kind/staging experiments, while stdio remains
-> the local default. Dedicated Kubernetes sandbox workers, external TLS-backed
-> services, and replicated immutable audit storage are still required before
-> production use. See [PLAN.md](PLAN.md).
+> **Project status:** Phases 0–8 provide the secure gateway, authenticated
+> Streamable HTTP staging entrypoint, sandbox controls, repair loop, audit
+> chain, evaluation harness, Helm chart, and Kind verification. The next
+> deployment-ready stages add OIDC/RBAC and tenant context, PostgreSQL control-
+> plane persistence, dedicated sandbox workers, immutable remote audit storage,
+> and hardened service integrations. Local Compose and Kind environments are
+> production-shaped test environments, not a substitute for HA cloud
+> operations. See [PLAN.md](PLAN.md) and
+> [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md).
 
 ## Why this project exists
 
@@ -36,15 +39,17 @@ Agent (MCP client)
 ┌───────────────────────────────────────────────────────────┐
 │ Gateway (FastAPI + MCP server)                            │
 │                                                           │
+│  OIDC/JWT ──► tenant/RBAC ──► schema validation            │
+│                                  │                        │
 │  Registry/schema validation ──► OPA policy decision       │
 │                                      │                    │
 │                           requires approval               │
 │                                      ▼                    │
 │                              Redis HITL queue              │
 │                                                           │
-│  Repair loop ──► sandbox runner ──► tool execution        │
+│  Repair loop ──► job queue ──► dedicated sandbox worker   │
 │                                                           │
-│  Redis state │ OpenTelemetry traces │ hash-chained audit  │
+│  PostgreSQL │ Redis │ OTel │ immutable audit sink         │
 └───────────────────────────────────────────────────────────┘
         │
         ▼
@@ -63,7 +68,9 @@ SQLite query runner │ shell executor │ Git workspace
 | 5 | Bounded repair and retry orchestration | Implemented |
 | 6 | Hash-chained audit and evaluation harness | Implemented |
 | 7 | Container packaging, Helm, and CI | Implemented |
-| 8 | Production hardening and Kind deployment | In progress |
+| 8 | Production hardening and Kind deployment | Implemented with local limits |
+| A | Documentation and scope expansion | In progress |
+| B–F | Identity, persistence, workers, evaluation gates, production integrations | Planned |
 
 Phase 2 records each call as `received`, `validated`, `policy_checked`,
 `executing`, and a terminal state. It creates a root `tool_call` span plus
@@ -102,6 +109,43 @@ receives the exact Pydantic schema and validation diagnosis and must return a
 JSON argument object. The gateway validates and rechecks policy before every
 repaired attempt. Policy denials are never sent for repair; non-idempotent
 mutations that may have partially executed return `needs_review`.
+
+## Local environments and production target
+
+The repository has two local execution profiles:
+
+| Profile | What it exercises | Intended use |
+|---|---|---|
+| Compose | stdio MCP, Redis, OPA, Jaeger, and hardened-Docker tools | Fast development and deterministic integration checks |
+| Kind | HTTP MCP service, Kubernetes probes, in-cluster Redis/OPA, Helm security context | Production-shaped local staging |
+
+The deployment-ready target extends the Kind profile with an OIDC provider,
+PostgreSQL, a dedicated sandbox-worker deployment, TLS and external secrets,
+Prometheus/Grafana, and an S3-compatible immutable audit sink. The local
+versions of those services prove interfaces and failure behavior; HA,
+disaster recovery, managed encryption, and independent trust domains still
+require a real production platform.
+
+## Request walkthrough
+
+1. The MCP client sends a tool request over stdio or authenticated Streamable
+   HTTP.
+2. The gateway verifies identity, tenant, and roles, then validates arguments
+   against the registry's Pydantic schema.
+3. OPA evaluates the verified principal, tenant, tool, risk class, and actual
+   arguments. A denial is terminal; a destructive request enters the approval
+   queue.
+4. The repair advisor may propose corrected arguments only for repairable
+   failures. The gateway validates and re-evaluates policy before every retry.
+5. An authorized request is submitted to a dedicated sandbox worker with an
+   idempotency key and bounded resources.
+6. State transitions, traces, approval evidence, attempts, and the outcome are
+   persisted. The audit record is hash-chained and replicated in compliance
+   mode.
+
+The complete deployment roadmap is in [PLAN.md](PLAN.md), beginning with
+Stage A (scope and documentation), followed by identity/RBAC, PostgreSQL,
+sandbox workers, evaluation gates, and production service integrations.
 
 ## Quick start
 
@@ -306,11 +350,11 @@ Never commit `.env`, credentials, tokens, private keys, or production data.
 | Stdio process crash | MCP connection terminates | Run supervised workers with restart and drain semantics |
 | Single-node audit file loss | Local evidence is unavailable | Replicate hash-chained records to WORM/object storage |
 
-The local deployment still supports the stdio server. The chart also supports
-the Streamable HTTP entrypoint and HTTP health probes for Kind and staging
-experiments; external secret management, a dedicated sandbox worker, HA
-Redis/OPA, and a durable remote audit sink remain deliberate follow-up
-improvements.
+The local deployment supports stdio and the authenticated Streamable HTTP
+entrypoint. The current chart is suitable for Kind and staging experiments.
+OIDC/RBAC, tenant-aware authorization, PostgreSQL control-plane persistence,
+dedicated sandbox workers, HA Redis/OPA, external secret management, and a
+durable remote audit sink are the next deployment-ready stages.
 
 See the full release gate and evidence in
 [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md).
@@ -362,9 +406,9 @@ systems.
 ## Scope
 
 The project intentionally supports only three deeply tested tool families:
-SQLite queries, shell execution, and Git workspaces. A web approval UI,
-multi-tenancy, RBAC, a custom policy language, and remote MCP proxying are outside
-the current scope.
+SQLite queries, shell execution, and Git workspaces. The deployment-ready
+roadmap includes multi-tenancy and RBAC, while a web approval UI, a custom
+policy language, and remote MCP proxying remain outside the current scope.
 
 ## Documentation
 

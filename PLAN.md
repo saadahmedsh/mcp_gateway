@@ -346,6 +346,66 @@ Acceptance criteria:
   the immutable image digest.
 - [ ] Kind smoke tests and all prior phase verification commands pass.
 
+### Post-Phase 8 — Deployment-ready control plane roadmap
+
+Phase 8 closes the original deployment blockers. The following work extends the
+system from a secure single-tenant gateway into a deployment-ready control plane.
+Each stage remains independently verifiable and must not weaken the existing
+policy, approval, repair, audit, or sandbox boundaries.
+
+#### Stage A — Documentation and scope
+
+- Update the README with the production architecture, request walkthrough,
+  benchmark interpretation, local staging instructions, and explicit limits.
+- Record the scope expansion from the original single-tenant anti-goals in
+  `docs/DECISIONS.md` and update the threat model.
+
+#### Stage B — Identity, RBAC, and tenant context
+
+- Add JWT/OIDC validation through a JWKS endpoint.
+- Model `user`, `operator`, and `admin` roles and a required tenant identifier.
+- Include subject, tenant, roles, and agent identity in every OPA input, audit
+  record, trace, approval, and PostgreSQL execution record.
+- Deny missing or cross-tenant context by default.
+
+#### Stage C — Durable control-plane persistence
+
+- Add PostgreSQL with SQLAlchemy/asyncpg and Alembic migrations.
+- Persist tenants, principals, approvals, tool calls, attempts, idempotency
+  keys, policy versions, and configuration in PostgreSQL.
+- Retain Redis only for short-lived coordination, locks, and waiting signals.
+- Add transaction, backup, restore, and migration verification tests.
+
+#### Stage D — Dedicated execution workers
+
+- Move tool execution behind an authenticated job protocol and worker queue.
+- Keep the gateway free of Docker-socket and privileged access.
+- Run workers on dedicated nodes with gVisor or Kata where available.
+- Add bounded concurrency, circuit breakers, idempotency keys, reconciliation,
+  and crash recovery for mutating operations.
+
+#### Stage E — Evaluation as a deployment gate
+
+- Run unit, integration, policy, adversarial, repair, and performance suites in
+  CI with reproducible scenario seeds.
+- Fail CI on any security invariant violation, unsafe retry, tenant-isolation
+  failure, high-severity image finding, or configured latency/cost regression.
+- Store signed evaluation artifacts alongside the release.
+
+#### Stage F — Production service integrations
+
+- Configure TLS and external secrets for PostgreSQL, Redis, OPA, OTLP, and the
+  identity provider.
+- Export metrics and dashboards, define SLOs, and add alerting and runbooks.
+- Replicate audit records to immutable object storage with retention locking.
+- Pin and sign image digests, generate SBOMs, scan releases, and verify supply
+  chain attestations before deployment.
+
+The local implementation target is Kind with local OIDC, PostgreSQL, Redis,
+OPA, worker, observability, and S3-compatible audit services. Cloud-managed
+services, HA, disaster recovery, and independently operated trust domains must
+still be validated in the production environment.
+
 ---
 
 ## 6. Definition of done for the whole project
@@ -362,8 +422,7 @@ Acceptance criteria:
 
 Do not build these. They expand scope without strengthening the three core differentiators:
 
-- A web UI for approvals. The CLI is sufficient; a UI is a portfolio distraction.
-- Multi-tenancy, RBAC, or user management.
+- A web approval UI, until the CLI and API control plane are complete.
 - MCP-to-MCP proxying to remote tool servers, until every phase above is done.
 - A custom policy DSL. OPA and Rego are the choice; do not abstract over Cedar as well.
 - Support for more than three tools. Depth on three beats breadth on eight.

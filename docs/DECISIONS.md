@@ -329,3 +329,21 @@ CLI has a portable `--runtime-flag` option.
   defeat the gateway's security boundary. A worker creates an explicit trust
   boundary and permits dedicated node policies.
 - **Rejected:** Mounting `/var/run/docker.sock` into the gateway for convenience.
+
+## ADR-0030: Expand the target from a single-tenant gateway to a deployment-ready control plane
+
+- **Status:** Accepted for the post-Phase 8 roadmap
+- **Decision:** Add OIDC/JWT identity, RBAC, tenant context, PostgreSQL control-
+  plane persistence, dedicated sandbox workers, deployment-gated evaluation,
+  and production service integrations. Retain stdio, SQLite, local JSONL, and
+  in-memory adapters as explicitly scoped development/test paths.
+- **Reason:** A production deployment needs authenticated principals, durable
+  control-plane state, isolation from the gateway process, and release evidence.
+  Local adapters remain valuable for fast deterministic tests, but they must not
+  be mistaken for production dependencies.
+- **Rejected:** Keeping RBAC, tenants, and durable persistence permanently out
+  of scope, because that would leave authorization and recovery dependent on
+  process-local or single-tenant assumptions.
+- **Trade-off:** The local stack becomes heavier and requires more integration
+  tests. The benefit is that Kind can exercise the same service boundaries and
+  failure behavior expected in a real deployment.
