@@ -1,2 +1,8 @@
 ---
-scenarios: []
+scenarios:
+  - name: select-orders
+    category: valid
+    tool: db_query
+    arguments:
+      query: SELECT order_id FROM orders ORDER BY order_id
+    expected: succeeded

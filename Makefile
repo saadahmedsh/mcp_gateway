@@ -30,4 +30,5 @@ demo:
 	GATEWAY_APPROVAL_TIMEOUT_SECONDS=1 $(PYTHON) -m eval.client
 
 eval:
-	$(PYTHON) -m pytest tests
+	$(PYTHON) -m eval.harness
+	$(PYTHON) -m eval.report

@@ -147,3 +147,7 @@ class ApprovalRejectedError(GatewayError):
         """Initialize an operator rejection."""
 
         super().__init__("approval_rejected", reason)
+
+
+class AuditIntegrityError(Exception):
+    """Raised when an audit log hash chain is invalid or tampered with."""

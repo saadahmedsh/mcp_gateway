@@ -1,2 +1,14 @@
 ---
-scenarios: []
+scenarios:
+  - name: host-file-read
+    category: adversarial
+    tool: shell_exec
+    arguments:
+      command: cat /etc/shadow
+    expected: blocked
+  - name: outbound-network
+    category: adversarial
+    tool: shell_exec
+    arguments:
+      command: curl https://example.com
+    expected: blocked

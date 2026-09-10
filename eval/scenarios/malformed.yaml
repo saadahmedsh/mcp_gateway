@@ -1,2 +1,14 @@
 ---
-scenarios: []
+scenarios:
+  - name: missing-query
+    category: malformed
+    tool: db_query
+    arguments:
+      max_rows: 10
+    expected: blocked
+  - name: wrong-query-type
+    category: malformed
+    tool: db_query
+    arguments:
+      query: 42
+    expected: blocked

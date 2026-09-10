@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import time
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
@@ -14,6 +15,7 @@ from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 
 from gateway import __version__
+from gateway.audit.log import AuditLogger
 from gateway.config import Settings, get_settings
 from gateway.errors import (
     ApprovalRejectedError,
@@ -119,6 +121,8 @@ async def execute_tool_call(
     policy_client: PolicyClient | None = None,
     approval_queue: ApprovalQueue | None = None,
     approval_timeout_seconds: float = 300.0,
+    audit_logger: AuditLogger | None = None,
+    sandbox_runtime: str = "unknown",
 ) -> types.CallToolResult:
     """Run one request through state persistence, tracing, and tool execution."""
 
@@ -127,6 +131,7 @@ async def execute_tool_call(
     tool_name = params.name
     definition: ToolDefinition[Any, Any] | None = None
     risk_class: RiskClass | None = None
+    started_monotonic = time.monotonic()
     try:
         definition = registry.get(tool_name)
         risk_class = definition.risk_class
@@ -170,6 +175,41 @@ async def execute_tool_call(
         logger = structlog.get_logger()
         latest_attempt = 1
         last_finished_attempt = 1
+        policy_outcome = "not_evaluated"
+        policy_input: dict[str, Any] = {}
+        matched_rule: str | None = None
+        approver_identity: str | None = None
+
+        async def write_audit(outcome: str) -> None:
+            """Write one terminal audit event without masking the client result."""
+
+            if audit_logger is None:
+                return
+            attempts: list[AttemptRecord] = []
+            try:
+                current = await state_store.get_call(call_id)
+                if current is not None:
+                    attempts = current.attempts
+            except StateStoreUnavailableError:
+                logger.warning("audit_state_unavailable")
+            try:
+                await audit_logger.append(
+                    call_id=call_id,
+                    session_id=session_id,
+                    trace_id=trace_id,
+                    tool_name=tool_name,
+                    arguments=params.arguments or {},
+                    policy_input=policy_input,
+                    policy_decision=policy_outcome,
+                    matched_rule=matched_rule,
+                    approver_identity=approver_identity,
+                    sandbox_runtime=sandbox_runtime,
+                    attempts=attempts,
+                    outcome=outcome,
+                    duration_ms=(time.monotonic() - started_monotonic) * 1000,
+                )
+            except Exception as audit_error:
+                logger.warning("audit_write_failed", error=str(audit_error))
 
         async def fail(error: GatewayError) -> types.CallToolResult:
             """Persist a failed state and return its structured client response."""
@@ -197,6 +237,9 @@ async def execute_tool_call(
                 return _tool_result(
                     state_error.response.model_dump(mode="json"), is_error=True
                 )
+            await write_audit(
+                "denied" if terminal_state is ToolCallState.DENIED else "failed"
+            )
             logger.info("tool_call_failed", error_code=error.response.error.code)
             return _tool_result(error.response.model_dump(mode="json"), is_error=True)
 
@@ -219,6 +262,8 @@ async def execute_tool_call(
                     "arguments": request.model_dump(mode="json"),
                 }
                 decision = await active_policy_client.evaluate(policy_input)
+                policy_outcome = decision.outcome
+                matched_rule = decision.matched_rule
                 policy_span.set_attribute("decision", decision.outcome)
                 policy_span.set_attribute("matched_rule", decision.matched_rule)
                 await state_store.transition(call_id, ToolCallState.POLICY_CHECKED)
@@ -254,6 +299,7 @@ async def execute_tool_call(
                     policy_span.set_attribute(
                         "approver", resolved.approver or "unknown"
                     )
+                    approver_identity = resolved.approver
                 elif decision.outcome != ALLOW:
                     await state_store.transition(
                         call_id, ToolCallState.DENIED, error=decision.reason
@@ -307,6 +353,7 @@ async def execute_tool_call(
                 RepairContext(risk_class=active_definition.risk_class),
             )
             await state_store.transition(call_id, ToolCallState.SUCCEEDED)
+            await write_audit("succeeded")
             logger.info("tool_call_succeeded", attempt=successful_attempt)
             return _tool_result(output.model_dump(mode="json"), is_error=False)
         except GatewayError as error:
@@ -323,6 +370,8 @@ def create_mcp_server(
     policy_client: PolicyClient | None = None,
     approval_queue: ApprovalQueue | None = None,
     approval_timeout_seconds: float = 300.0,
+    audit_logger: AuditLogger | None = None,
+    sandbox_runtime: str = "unknown",
 ) -> Server[dict[str, Any]]:
     """Create the official MCP protocol adapter around the gateway runtime."""
 
@@ -356,6 +405,8 @@ def create_mcp_server(
             active_policy_client,
             approval_queue,
             approval_timeout_seconds,
+            audit_logger,
+            sandbox_runtime,
         )
 
     return Server(
@@ -389,6 +440,7 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
         str(active_settings.redis_url),
         ttl_seconds=active_settings.state_ttl_seconds,
     )
+    audit_logger = AuditLogger(active_settings.audit_log_path)
     sandbox_runner = (
         None
         if active_settings.environment == "test"
@@ -409,6 +461,8 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
         policy_client=policy_client,
         approval_queue=approval_queue,
         approval_timeout_seconds=active_settings.approval_timeout_seconds,
+        audit_logger=audit_logger,
+        sandbox_runtime=active_settings.sandbox_runtime,
     )
     try:
         async with stdio_server() as (read_stream, write_stream):

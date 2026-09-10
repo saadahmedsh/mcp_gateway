@@ -1,2 +1,8 @@
 ---
-scenarios: []
+scenarios:
+  - name: bounded-sql-query
+    category: slow
+    tool: db_query
+    arguments:
+      query: SELECT order_id FROM orders LIMIT 1
+    expected: succeeded

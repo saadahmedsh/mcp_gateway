@@ -124,3 +124,24 @@ class ErrorResponse(StrictModel):
     """Top-level error response for an unsuccessful tool call."""
 
     error: ErrorDetail
+
+
+class AuditRecord(StrictModel):
+    """One immutable, hash-chained record of a completed tool call."""
+
+    timestamp: datetime
+    call_id: str
+    session_id: str
+    trace_id: str
+    tool_name: str
+    arguments: dict[str, Any]
+    policy_input: dict[str, Any]
+    policy_decision: str
+    matched_rule: str | None
+    approver_identity: str | None
+    sandbox_runtime: str
+    attempts: list[AttemptRecord]
+    outcome: str
+    duration_ms: float
+    previous_hash: str
+    record_hash: str

@@ -3,13 +3,12 @@
 A security and reliability control plane between LLM agents and the tools they
 invoke through the Model Context Protocol (MCP).
 
-> **Project status:** Phase 5 bounded repair and safe retry handling is
-> implemented on top of the Phase 4 sandbox path. gVisor host validation is
-> still pending. A real MCP client can discover
-> tools and execute calls while the gateway persists lifecycle state, emits
-> traces, and evaluates every live call through fail-closed OPA policy. Mutating
-> and destructive calls pause for explicit CLI approval. Repair and the audit
-> chain remain planned capabilities. See [PLAN.md](PLAN.md).
+> **Project status:** Phase 6 audit logging and evaluation are implemented on
+> top of the Phase 5 repair loop and Phase 4 sandbox path. gVisor host
+> validation is still pending. A real MCP client can discover tools and execute
+> calls while the gateway persists lifecycle state, emits traces, evaluates
+> every live call through fail-closed OPA policy, and writes hash-chained audit
+> records. See [PLAN.md](PLAN.md).
 
 ## Why this project exists
 
@@ -62,7 +61,7 @@ SQLite query runner │ shell executor │ Git workspace
 | 3 | OPA policy enforcement and human approval | Complete |
 | 4 | gVisor and hardened-Docker execution | In progress |
 | 5 | Bounded repair and retry orchestration | Implemented |
-| 6 | Hash-chained audit and evaluation harness | Planned |
+| 6 | Hash-chained audit and evaluation harness | Implemented |
 | 7 | Container packaging, Helm, and CI | Planned |
 
 Phase 2 records each call as `received`, `validated`, `policy_checked`,
@@ -85,6 +84,15 @@ Phase 5 diagnoses failures into schema, timeout, sandbox, policy, and tool
 categories. Read-only transient failures are retried with bounded exponential
 backoff. Policy denials are terminal, and non-idempotent mutations surface as
 `needs_review` instead of being retried blindly.
+
+Phase 6 appends one JSONL audit record for every completed call. Each record
+contains the policy result, approval identity, attempts, runtime, outcome, and
+duration, and links to the previous record with SHA-256. Run `make eval` to
+execute all checked-in scenarios, write `eval/results.json`, and regenerate the
+metrics section in [docs/BENCHMARKS.md](docs/BENCHMARKS.md). The harness uses the
+gateway dispatcher with an in-memory state backend for deterministic local
+measurements; production transport and sandbox measurements remain separate
+smoke checks.
 
 ## Quick start
 
@@ -169,6 +177,12 @@ make down
 make lint       # Ruff, Black, and strict mypy
 make test       # pytest suite
 make eval       # phase-appropriate evaluation target
+```
+
+Verify a generated audit chain with:
+
+```bash
+.venv/bin/python -m gateway.audit.verify data/audit.jsonl
 ```
 
 Install the Git hooks after creating the environment:

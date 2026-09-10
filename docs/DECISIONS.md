@@ -192,6 +192,31 @@ The Docker daemon must configure runsc with `platform=ptrace` in its runtime
 arguments; the gateway selects `--runtime runsc` and does not pretend Docker's
 CLI has a portable `--runtime-flag` option.
 
+## ADR-0020: Use a local append-only JSONL audit sink
+
+- **Status:** Accepted in Phase 6
+- **Decision:** Write one canonical JSONL record per terminal tool call. Include
+  the previous digest and a SHA-256 digest of the record payload; verify the
+  chain before relying on it.
+- **Reason:** JSONL is inspectable during development, supports append-only
+  filesystem semantics, and keeps the audit contract independent from Redis
+  expiration. Writes run in a worker thread and fsync before returning.
+- **Rejected:** Storing audit records only in Redis, because lifecycle TTLs and
+  mutable keys are not an immutable evidence trail. A remote event bus was
+  deferred until deployment packaging defines its operational dependency.
+
+## ADR-0021: Keep evaluation deterministic and machine-readable
+
+- **Status:** Accepted in Phase 6
+- **Decision:** Scenario YAML files run through the gateway dispatcher with an
+  in-memory state backend; `eval/results.json` is the source for the generated
+  benchmark table.
+- **Reason:** The evaluation can run without a live Redis/OPA cluster while
+  still exercising validation, policy boundary adapters, execution, and result
+  classification. The JSON artifact makes every number reproducible.
+- **Rejected:** Hard-coding benchmark numbers or requiring an external LLM for
+  scenario repair, because either makes local verification nondeterministic.
+
 ## ADR-0018: Keep repair policy separate from authorization policy
 
 - **Status:** Accepted in Phase 5
