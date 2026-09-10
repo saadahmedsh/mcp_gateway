@@ -143,7 +143,9 @@ class AnthropicRepairAdvisor:
                 "Repair tool arguments without changing the requested "
                 "operation. Return valid JSON only."
             ),
-            "messages": [{"role": "user", "content": json.dumps(prompt, sort_keys=True)}],
+            "messages": [
+                {"role": "user", "content": json.dumps(prompt, sort_keys=True)}
+            ],
         }
         headers = {
             "x-api-key": self._api_key,
@@ -166,7 +168,9 @@ class AnthropicRepairAdvisor:
             ValueError,
             json.JSONDecodeError,
         ) as error:
-            raise ValueError("The Anthropic repair model returned an invalid response") from error
+            raise ValueError(
+                "The Anthropic repair model returned an invalid response"
+            ) from error
         if diagnosis.category is RepairFailure.POLICY_DENIED:
             raise ValueError("Policy denials cannot be repaired")
         if not isinstance(repaired, dict):

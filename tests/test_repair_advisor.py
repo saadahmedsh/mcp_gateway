@@ -58,7 +58,9 @@ class _AnthropicResponse:
     def json(self) -> dict[str, Any]:
         """Return an Anthropic Messages API response."""
 
-        return {"content": [{"type": "text", "text": '{"arguments":{"value":"fixed"}}'}]}
+        return {
+            "content": [{"type": "text", "text": '{"arguments":{"value":"fixed"}}'}]
+        }
 
 
 class _AnthropicClient:

@@ -46,7 +46,11 @@ from gateway.policy.client import (
 )
 from gateway.policy.decisions import ALLOW, REQUIRES_APPROVAL
 from gateway.registry import ToolDefinition, ToolRegistry
-from gateway.repair.advisor import AnthropicRepairAdvisor, LLMRepairAdvisor, RepairAdvisor
+from gateway.repair.advisor import (
+    AnthropicRepairAdvisor,
+    LLMRepairAdvisor,
+    RepairAdvisor,
+)
 from gateway.repair.diagnose import FailureDiagnosis, diagnose
 from gateway.repair.loop import RepairContext, RepairLoop
 from gateway.sandbox.runner import SandboxRunner

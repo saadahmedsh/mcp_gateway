@@ -15,7 +15,11 @@ from gateway.audit.log import AuditLogger
 from gateway.config import Settings, get_settings
 from gateway.hitl.queue import RedisApprovalQueue
 from gateway.policy.client import AllowAllPolicyClient, OpaPolicyClient, PolicyClient
-from gateway.repair.advisor import LLMRepairAdvisor, RepairAdvisor
+from gateway.repair.advisor import (
+    AnthropicRepairAdvisor,
+    LLMRepairAdvisor,
+    RepairAdvisor,
+)
 from gateway.sandbox.runner import SandboxRunner
 from gateway.server import create_mcp_server, create_registry
 from gateway.state.redis_store import create_state_store
@@ -92,12 +96,20 @@ def create_http_app(settings: Settings | None = None) -> ASGIApp:
         active_settings.repair_enabled
         and active_settings.repair_llm_api_key is not None
     ):
-        repair_advisor = LLMRepairAdvisor(
+        advisor_arguments = (
             str(active_settings.repair_llm_url),
             active_settings.repair_llm_model,
             active_settings.repair_llm_api_key.get_secret_value(),
             active_settings.repair_llm_timeout_seconds,
         )
+        if active_settings.repair_llm_provider == "anthropic":
+            repair_advisor = AnthropicRepairAdvisor(
+                *advisor_arguments,
+                anthropic_version=active_settings.repair_llm_anthropic_version,
+                max_tokens=active_settings.repair_llm_max_tokens,
+            )
+        else:
+            repair_advisor = LLMRepairAdvisor(*advisor_arguments)
     sandbox_runner = (
         None
         if active_settings.environment == "test"

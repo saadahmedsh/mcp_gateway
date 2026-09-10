@@ -40,7 +40,11 @@ eval-realistic:
 	$(PYTHON) -m eval.realistic
 
 kind-up:
-	kind create cluster --config docker/kind-config.yaml
+	@if kind get clusters | grep -qx 'mcp-gateway'; then \
+		echo 'Kind cluster mcp-gateway already exists'; \
+	else \
+		kind create cluster --config docker/kind-config.yaml; \
+	fi
 
 kind-load: kind-up
 	docker build --tag mcp-gateway:kind --file docker/Dockerfile.gateway .
