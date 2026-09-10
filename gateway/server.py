@@ -41,6 +41,7 @@ from gateway.policy.client import (
 )
 from gateway.policy.decisions import ALLOW, REQUIRES_APPROVAL
 from gateway.registry import ToolDefinition, ToolRegistry
+from gateway.sandbox.runner import SandboxRunner
 from gateway.state.redis_store import (
     InMemoryStateStore,
     StateStore,
@@ -51,12 +52,15 @@ from gateway.tools.shell_exec import create_shell_exec_tool
 from gateway.tracing.otel import TracingManager, configure_logging, create_tracing
 
 
-def create_registry(settings: Settings) -> ToolRegistry:
+def create_registry(
+    settings: Settings,
+    sandbox_runner: SandboxRunner | None = None,
+) -> ToolRegistry:
     """Build the gateway's deterministic Phase 1 tool registry."""
 
     registry = ToolRegistry()
-    registry.register(create_db_query_tool(settings.database_path))
-    registry.register(create_shell_exec_tool())
+    registry.register(create_db_query_tool(settings.database_path, sandbox_runner))
+    registry.register(create_shell_exec_tool(sandbox_runner))
     return registry
 
 
@@ -350,8 +354,17 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
         str(active_settings.redis_url),
         ttl_seconds=active_settings.state_ttl_seconds,
     )
+    sandbox_runner = (
+        None
+        if active_settings.environment == "test"
+        else SandboxRunner(
+            active_settings.sandbox_runtime,
+            active_settings.sandbox_image,
+            active_settings.sandbox_output_limit_bytes,
+        )
+    )
     session_id = uuid4().hex
-    registry = create_registry(active_settings)
+    registry = create_registry(active_settings, sandbox_runner)
 
     server = create_mcp_server(
         registry,

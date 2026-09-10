@@ -164,3 +164,30 @@ from later phases will be added only when those phases begin.
   executor boundary.
 - **Rejected:** Removing SQLite authorizer protections to make `DELETE` execute,
   because that would violate the Phase 1 security boundary.
+
+## ADR-0016: Use fresh Docker containers as the Phase 4 isolation boundary
+
+- **Status:** Accepted in Phase 4
+- **Decision:** Execute each tool call in a named, one-shot container with a
+  read-only root filesystem, dropped capabilities, `no-new-privileges`, no
+  network by default, seccomp, tmpfs workspace, cgroup limits, and a pids limit.
+- **Reason:** This is available on native Docker under WSL2 and gives the
+  runner explicit lifecycle and cleanup semantics.
+- **Rejected:** Running tool code in the gateway process, because a compromised
+  tool could access gateway memory and host resources. Long-lived pooled
+  containers were deferred because they complicate cleanup and cross-call state.
+
+## ADR-0017: Support gVisor ptrace and hardened Docker as selectable runtimes
+
+- **Status:** Accepted in Phase 4
+- **Decision:** Use `runsc` with `platform=ptrace` when configured, and retain a
+  hardened-Docker profile as the default fallback.
+- **Reason:** WSL2 commonly cannot provide reliable nested KVM; ptrace avoids
+  that dependency while the fallback keeps the system usable where runsc is not
+  installed.
+- **Rejected:** Assuming KVM-backed gVisor everywhere, because it would make
+  the documented WSL2 development path fail.
+
+The Docker daemon must configure runsc with `platform=ptrace` in its runtime
+arguments; the gateway selects `--runtime runsc` and does not pretend Docker's
+CLI has a portable `--runtime-flag` option.

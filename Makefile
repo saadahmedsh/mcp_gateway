@@ -1,12 +1,15 @@
 PYTHON ?= .venv/bin/python
 COMPOSE ?= docker compose
 
-.PHONY: up down test lint demo eval install
+.PHONY: up down test lint demo eval install sandbox-build
 
 install:
 	$(PYTHON) -m pip install --requirement requirements.lock
 
-up:
+sandbox-build:
+	docker build --tag mcp-gateway-tool:local --file docker/Dockerfile.tool-base .
+
+up: sandbox-build
 	$(COMPOSE) up --detach --wait
 
 down:

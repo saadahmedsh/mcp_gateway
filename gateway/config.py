@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     state_ttl_seconds: int = 86_400
     approval_timeout_seconds: int = 300
     sandbox_runtime: Literal["gvisor", "hardened-docker"] = "hardened-docker"
+    sandbox_image: str = "mcp-gateway-tool:local"
+    sandbox_output_limit_bytes: int = 1_048_576
+    sandbox_startup_timeout_seconds: float = 30.0
     audit_log_path: Path = Path("data/audit.jsonl")
 
 

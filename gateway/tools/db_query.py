@@ -4,13 +4,16 @@ import asyncio
 import sqlite3
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 
 from pydantic import Field
 
 from gateway.errors import ToolExecutionError
 from gateway.models import RiskClass, StrictModel
 from gateway.registry import ToolDefinition
+
+if TYPE_CHECKING:
+    from gateway.sandbox.runner import SandboxRunner
 
 SqlScalar: TypeAlias = str | int | float | None
 SqlParameters: TypeAlias = list[SqlScalar] | dict[str, SqlScalar]
@@ -163,12 +166,26 @@ async def query_database(database_path: Path, request: DbQueryInput) -> DbQueryO
 
 def create_db_query_tool(
     database_path: Path,
+    runner: "SandboxRunner | None" = None,
 ) -> ToolDefinition[DbQueryInput, DbQueryOutput]:
     """Create a database tool bound to a configured SQLite file."""
 
     async def handler(request: DbQueryInput) -> DbQueryOutput:
         """Execute a validated request against the bound database path."""
 
+        if runner is not None:
+            from gateway.sandbox.profiles import profile_for_tool
+
+            result = await runner.run_worker(
+                {
+                    "kind": "db_query",
+                    "database_path": "/data/gateway.sqlite",
+                    "request": request.model_dump(mode="json"),
+                },
+                profile_for_tool("db_query", Path(".")),
+                mounts=((database_path, "/data/gateway.sqlite", True),),
+            )
+            return DbQueryOutput.model_validate(result)
         return await query_database(database_path, request)
 
     return ToolDefinition(

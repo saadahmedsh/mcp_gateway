@@ -1,1 +1,9 @@
-# The isolated tool base image is intentionally deferred to Phase 4.
+FROM python:3.12-slim
+
+RUN useradd --create-home --uid 10001 tool
+WORKDIR /opt/gateway
+COPY requirements.txt .
+RUN pip install --no-cache-dir --requirement requirements.txt
+COPY gateway ./gateway
+COPY docker/seccomp/tool.json /opt/gateway/seccomp/tool.json
+USER tool

@@ -3,13 +3,12 @@
 A security and reliability control plane between LLM agents and the tools they
 invoke through the Model Context Protocol (MCP).
 
-> **Project status:** Phase 3 policy and approval enforcement is implemented.
-> One write-capable executor criterion remains intentionally deferred. A real
-> MCP client can discover
+> **Project status:** Phase 4 sandbox execution is implemented for the live
+> gateway path, with gVisor host validation still pending. A real MCP client can discover
 > tools and execute calls while the gateway persists lifecycle state, emits
 > traces, and evaluates every live call through fail-closed OPA policy. Mutating
-> and destructive calls pause for explicit CLI approval. Sandboxing, repair,
-> and the audit chain remain planned capabilities. See [PLAN.md](PLAN.md).
+> and destructive calls pause for explicit CLI approval. Repair and the audit
+> chain remain planned capabilities. See [PLAN.md](PLAN.md).
 
 ## Why this project exists
 
@@ -59,8 +58,8 @@ SQLite query runner │ shell executor │ Git workspace
 | 0 | Environment and repository skeleton | Complete |
 | 1 | MCP server, registry, and database query tool | Complete |
 | 2 | Redis lifecycle state and OpenTelemetry tracing | Complete |
-| 3 | OPA policy enforcement and human approval | In progress |
-| 4 | gVisor and hardened-Docker execution | Planned |
+| 3 | OPA policy enforcement and human approval | Complete |
+| 4 | gVisor and hardened-Docker execution | In progress |
 | 5 | Bounded repair and retry orchestration | Planned |
 | 6 | Hash-chained audit and evaluation harness | Planned |
 | 7 | Container packaging, Helm, and CI | Planned |
@@ -75,6 +74,11 @@ Phase 3 evaluates the declared risk class and the actual arguments. A policy
 denial never reaches tool execution. A `requires_approval` result is stored in
 Redis and waits for an operator decision from the CLI; rejection or timeout
 transitions the call to `denied`.
+
+Phase 4 runs live tool calls in a fresh hardened Docker container. The default
+profile has no network, no capabilities, a read-only root filesystem, a tmpfs
+workspace, seccomp, memory/CPU/pids limits, output limits, and explicit cleanup.
+The gVisor runtime is selectable when `runsc` is installed.
 
 ## Quick start
 
@@ -192,7 +196,9 @@ by Git; `.env.example` contains safe defaults.
 | `GATEWAY_JAEGER_UI_URL` | `http://localhost:16686` | Jaeger UI |
 | `GATEWAY_DATABASE_PATH` | `data/gateway.sqlite` | Synthetic SQLite database |
 | `GATEWAY_APPROVAL_TIMEOUT_SECONDS` | `300` | Human approval timeout |
-| `GATEWAY_SANDBOX_RUNTIME` | `hardened-docker` | Future sandbox runtime |
+| `GATEWAY_SANDBOX_RUNTIME` | `hardened-docker` | `hardened-docker` or `gvisor` |
+| `GATEWAY_SANDBOX_IMAGE` | `mcp-gateway-tool:local` | Tool image used for isolated calls |
+| `GATEWAY_SANDBOX_OUTPUT_LIMIT_BYTES` | `1048576` | Maximum combined stream size per stream |
 | `GATEWAY_AUDIT_LOG_PATH` | `data/audit.jsonl` | Future audit destination |
 
 Never commit `.env`, credentials, tokens, private keys, or production data.
@@ -234,10 +240,10 @@ will fail closed when policy evaluation is unavailable and will never rewrite a
 denied request to evade policy. Tool execution will receive restrictive resource,
 filesystem, capability, process, and network limits.
 
-Those are **target guarantees, not current Phase 3 guarantees**. Phase 3 adds
-deterministic policy and human approval, while the database tool remains
-physically read-only until sandboxed execution is implemented. The formal threat
-model and executable isolation tests arrive in Phase 4. Until then, do not
+Those are **target guarantees, not unrestricted host guarantees**. Phase 4 adds
+the Docker isolation boundary, while the database tool remains physically
+read-only. Read [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for residual risks;
+the Docker daemon and host kernel remain trusted components. Do not
 connect this repository to untrusted agents or grant it access to production
 systems.
 
@@ -252,7 +258,7 @@ the current scope.
 
 - [PLAN.md](PLAN.md) — authoritative phase plan and acceptance criteria
 - [Architecture decisions](docs/DECISIONS.md) — accepted and rejected trade-offs
-- [Threat model](docs/THREAT_MODEL.md) — populated during Phase 4
+- [Threat model](docs/THREAT_MODEL.md) — Phase 4 isolation assumptions and residual risks
 - [Benchmarks](docs/BENCHMARKS.md) — generated from the Phase 6 evaluation suite
 
 ## License

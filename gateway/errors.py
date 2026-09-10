@@ -74,6 +74,24 @@ class ToolExecutionError(GatewayError):
         super().__init__("tool_execution_failed", message)
 
 
+class SandboxError(GatewayError):
+    """Raised when isolated tool execution fails."""
+
+    def __init__(self, message: str) -> None:
+        """Initialize a sandbox execution error."""
+
+        super().__init__("sandbox_error", message)
+
+
+class SandboxTimeoutError(SandboxError):
+    """Raised when a sandbox exceeds its wall-clock limit."""
+
+    def __init__(self) -> None:
+        """Initialize a sandbox timeout error."""
+
+        super().__init__("Sandbox execution exceeded its wall-clock timeout")
+
+
 class StateStoreUnavailableError(GatewayError):
     """Raised when durable call state cannot be read or written."""
 
