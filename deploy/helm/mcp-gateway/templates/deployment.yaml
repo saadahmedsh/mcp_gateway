@@ -21,6 +21,7 @@ spec:
         - name: gateway
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "-m", "gateway.http_server"]
           ports:
             - name: gateway
               containerPort: {{ .Values.service.port }}
@@ -47,6 +48,25 @@ spec:
               value: {{ .Values.gateway.repairLlmUrl | quote }}
             - name: GATEWAY_REPAIR_LLM_MODEL
               value: {{ .Values.gateway.repairLlmModel | quote }}
+            - name: GATEWAY_HTTP_HOST
+              value: {{ .Values.gateway.httpHost | quote }}
+            - name: GATEWAY_HTTP_PORT
+              value: {{ .Values.gateway.httpPort | quote }}
+            - name: GATEWAY_HTTP_PATH
+              value: {{ .Values.gateway.httpPath | quote }}
+            - name: GATEWAY_HTTP_MAX_REQUEST_BODY_BYTES
+              value: {{ .Values.gateway.httpMaxRequestBodyBytes | quote }}
+            - name: GATEWAY_HTTP_SESSION_IDLE_TIMEOUT_SECONDS
+              value: {{ .Values.gateway.httpSessionIdleTimeoutSeconds | quote }}
+            - name: GATEWAY_HTTP_MAX_SESSIONS
+              value: {{ .Values.gateway.httpMaxSessions | quote }}
+            {{- if .Values.gateway.httpAuthToken }}
+            - name: GATEWAY_HTTP_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mcp-gateway.fullname" . }}-http-auth
+                  key: token
+            {{- end }}
             {{- if .Values.gateway.repairLlmApiKey }}
             - name: GATEWAY_REPAIR_LLM_API_KEY
               valueFrom:
@@ -63,15 +83,23 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           livenessProbe:
-            exec:
-              command: ["python", "-c", "from gateway.config import Settings; Settings()"]
+            httpGet:
+              path: /livez
+              port: gateway
             initialDelaySeconds: 15
             periodSeconds: 30
           readinessProbe:
-            exec:
-              command: ["python", "-c", "from gateway.config import Settings; Settings()"]
+            httpGet:
+              path: /readyz
+              port: gateway
             initialDelaySeconds: 5
             periodSeconds: 10
+          startupProbe:
+            httpGet:
+              path: /startupz
+              port: gateway
+            failureThreshold: 30
+            periodSeconds: 5
       volumes:
         - name: data
           {{- if .Values.persistence.enabled }}

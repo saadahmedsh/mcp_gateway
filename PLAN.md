@@ -314,9 +314,43 @@ Acceptance criteria:
 
 ---
 
+### Phase 8 — Production hardening and Kind deployment
+
+**Goal:** close the deployment blockers identified after Phase 7 without
+weakening the gateway's policy or sandbox boundaries.
+
+Tasks:
+- Add authenticated Streamable HTTP while retaining stdio for local use.
+- Add dependency-aware liveness, readiness, and startup probes.
+- Validate the base Helm chart with a provider-neutral Kind cluster.
+- Keep the gateway unprivileged and define a dedicated Kubernetes sandbox-worker
+  boundary; never mount the host Docker socket into the gateway.
+- Add TLS/authentication configuration for Redis, OPA, and OTLP using external
+  secrets rather than plaintext Helm values.
+- Deploy OPA as a real service using versioned, signed policy bundles.
+- Replace local-only audit durability with a replicated immutable sink and an
+  explicit fail-closed compliance mode.
+- Add HA controls, image signing, SBOM generation, vulnerability scanning, and
+  digest-pinned deployment artifacts.
+
+Acceptance criteria:
+- [ ] Authenticated Streamable HTTP MCP calls succeed through a Kind Service.
+- [ ] `/livez`, `/startupz`, and dependency-aware `/readyz` behave correctly
+  during Redis and OPA failures.
+- [ ] No gateway pod has Docker-socket or privileged runtime access.
+- [ ] OPA policy bundles are loaded by an OPA deployment and policy changes are
+  versioned and auditable.
+- [ ] Audit records survive gateway restart and are verifiable from replicated
+  immutable storage.
+- [ ] CI emits an SBOM, rejects high-severity image vulnerabilities, and signs
+  the immutable image digest.
+- [ ] Kind smoke tests and all prior phase verification commands pass.
+
+---
+
 ## 6. Definition of done for the whole project
 
-- [ ] All seven phases' criteria pass.
+- [ ] All eight phases' criteria pass.
 - [ ] `docs/THREAT_MODEL.md` states what is defended, what is explicitly out of scope, and the residual risks.
 - [ ] `docs/DECISIONS.md` records each significant trade-off with the rejected alternative.
 - [ ] `docs/BENCHMARKS.md` contains reproducible numbers, not estimates.
@@ -344,5 +378,5 @@ Do not build these. They expand scope without strengthening the three core diffe
 | gVisor unusable under WSL2 nested virt | `--platform=ptrace`; fall back to hardened Docker and document the trade-off |
 | Sandbox overhead makes latency look bad | Measure it, publish it, discuss pooling warm sandboxes as future work |
 | Repair loop masks real bugs | Cap attempts, log every attempt, never retry policy denials |
-| Scope creep across seven phases | Anti-goals list above; one phase at a time |
+| Scope creep across eight phases | Anti-goals list above; one phase at a time |
 | Benchmarks that cannot be reproduced | Everything runs from `make eval` against scenario files in the repo |

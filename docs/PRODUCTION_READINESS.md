@@ -20,9 +20,9 @@ Review date: 2026-09-10
 
 These items should be resolved before production traffic is permitted:
 
-1. The gateway currently speaks MCP over stdio. The Helm Service port is only a
-   packaging placeholder; an authenticated network MCP transport is required
-   for Kubernetes clients.
+1. The gateway now exposes an authenticated Streamable HTTP entrypoint for Kind
+   and staging. Production still requires OIDC or mTLS authentication,
+   ingress/TLS termination, and a load-tested network deployment.
 2. Kubernetes does not provide the Docker socket to the gateway. Sandbox calls
    therefore require a dedicated worker service or a Kubernetes-native runtime.
 3. Redis, OPA, and OTLP defaults use plaintext local URLs. Production requires

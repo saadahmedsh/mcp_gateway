@@ -26,6 +26,13 @@ def _clear_gateway_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "GATEWAY_REPAIR_LLM_MODEL",
         "GATEWAY_REPAIR_LLM_API_KEY",
         "GATEWAY_REPAIR_LLM_TIMEOUT_SECONDS",
+        "GATEWAY_HTTP_HOST",
+        "GATEWAY_HTTP_PORT",
+        "GATEWAY_HTTP_PATH",
+        "GATEWAY_HTTP_AUTH_TOKEN",
+        "GATEWAY_HTTP_MAX_REQUEST_BODY_BYTES",
+        "GATEWAY_HTTP_SESSION_IDLE_TIMEOUT_SECONDS",
+        "GATEWAY_HTTP_MAX_SESSIONS",
     )
     for name in names:
         monkeypatch.delenv(name, raising=False)
@@ -45,6 +52,9 @@ def test_settings_have_safe_local_defaults(
     assert settings.database_path == Path("data/gateway.sqlite")
     assert settings.sandbox_runtime == "hardened-docker"
     assert settings.audit_log_path == Path("data/audit.jsonl")
+    assert settings.http_host == "0.0.0.0"
+    assert settings.http_port == 8080
+    assert settings.http_path == "/mcp"
 
 
 def test_settings_can_be_overridden_from_environment(

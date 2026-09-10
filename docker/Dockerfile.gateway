@@ -17,5 +17,5 @@ COPY docker/seccomp/tool.json ./docker/seccomp/tool.json
 COPY .env.example ./.env.example
 USER gateway
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "from gateway.config import Settings; Settings()"
-ENTRYPOINT ["python", "-m", "gateway.server"]
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/livez', timeout=3)"
+ENTRYPOINT ["python", "-m", "gateway.http_server"]

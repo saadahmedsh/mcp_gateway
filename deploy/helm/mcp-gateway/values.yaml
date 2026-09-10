@@ -8,6 +8,7 @@ image:
 service:
   type: ClusterIP
   port: 8080
+  nodePort: 30080
 
 resources:
   requests:
@@ -30,6 +31,13 @@ gateway:
   repairLlmUrl: http://repair-service/v1/chat/completions
   repairLlmModel: repair-model
   repairLlmApiKey: ""
+  httpHost: 0.0.0.0
+  httpPort: 8080
+  httpPath: /mcp
+  httpAuthToken: ""
+  httpMaxRequestBodyBytes: 4194304
+  httpSessionIdleTimeoutSeconds: 1800
+  httpMaxSessions: 10000
 
 policyBundles:
   tools.rego: |

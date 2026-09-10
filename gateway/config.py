@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     repair_llm_model: str = "repair-model"
     repair_llm_api_key: SecretStr | None = None
     repair_llm_timeout_seconds: float = 15.0
+    http_host: str = "0.0.0.0"
+    http_port: int = 8080
+    http_path: str = "/mcp"
+    http_auth_token: SecretStr | None = None
+    http_max_request_body_bytes: int = 4 * 1024 * 1024
+    http_session_idle_timeout_seconds: float = 1800.0
+    http_max_sessions: int = 10_000
 
 
 @lru_cache

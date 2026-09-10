@@ -296,3 +296,36 @@ CLI has a portable `--runtime-flag` option.
 - **Reason:** A timeout does not prove that the remote side did nothing.
 - **Rejected:** Blind retries based only on the exception type, because they can
   duplicate side effects.
+
+## ADR-0027: Use Streamable HTTP for network MCP and retain stdio locally
+
+- **Status:** Accepted for production hardening
+- **Decision:** Add an authenticated Streamable HTTP entrypoint for Kubernetes
+  deployments while retaining stdio for local development and compatibility.
+- **Reason:** Kubernetes clients require a network listener, while stdio remains
+  the smallest and safest local transport for demonstrations and subprocess
+  integration tests. The MCP SDK provides both transport paths.
+- **Rejected:** Replacing stdio outright, because it would break the existing
+  local test workflow and remove a useful isolated deployment mode.
+
+## ADR-0028: Use Kind and provider-neutral integration manifests
+
+- **Status:** Accepted for production hardening
+- **Decision:** Validate the first Kubernetes deployment with Kind and avoid
+  cloud-specific resources in the base Helm chart.
+- **Reason:** Kind is reproducible in developer machines and CI. Cloud-specific
+  Redis, identity, object storage, and runtime integrations remain optional
+  overlays rather than hidden assumptions in the core chart.
+- **Rejected:** Targeting one cloud immediately, because it would make local
+  verification and portability unnecessarily difficult.
+
+## ADR-0029: Keep the gateway unprivileged and isolate sandbox workers
+
+- **Status:** Accepted for production hardening
+- **Decision:** The gateway never receives a Docker socket or privileged runtime
+  access. Kubernetes sandbox execution is delegated to a separately deployed
+  worker using a Kubernetes RuntimeClass such as gVisor or Kata.
+- **Reason:** Docker socket access is effectively host-root access and would
+  defeat the gateway's security boundary. A worker creates an explicit trust
+  boundary and permits dedicated node policies.
+- **Rejected:** Mounting `/var/run/docker.sock` into the gateway for convenience.

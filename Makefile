@@ -1,7 +1,7 @@
 PYTHON ?= .venv/bin/python
 COMPOSE ?= docker compose
 
-.PHONY: up down test lint demo eval eval-live install sandbox-build
+.PHONY: up down test lint demo eval eval-live install sandbox-build kind-up kind-load kind-deploy kind-down
 
 install:
 	$(PYTHON) -m pip install --requirement requirements.lock
@@ -35,3 +35,20 @@ eval:
 
 eval-live:
 	$(PYTHON) -m eval.live
+
+kind-up:
+	kind create cluster --config docker/kind-config.yaml
+
+kind-load: kind-up
+	docker build --tag mcp-gateway:kind --file docker/Dockerfile.gateway .
+	kind load docker-image mcp-gateway:kind --name mcp-gateway
+
+kind-deploy: kind-load
+	helm upgrade --install mcp-gateway deploy/helm/mcp-gateway \
+		--set image.repository=mcp-gateway \
+		--set image.tag=kind \
+		--set image.pullPolicy=Never \
+		--set service.type=NodePort
+
+kind-down:
+	kind delete cluster --name mcp-gateway

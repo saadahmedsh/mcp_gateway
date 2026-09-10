@@ -200,6 +200,15 @@ class RedisStateStore:
 
         await self._client.aclose()
 
+    async def healthcheck(self) -> bool:
+        """Ping Redis within the configured operation timeout."""
+
+        try:
+            async with asyncio.timeout(self._timeout):
+                return bool(await self._client.ping())
+        except (RedisError, OSError, TimeoutError):
+            return False
+
 
 class InMemoryStateStore:
     """Deterministic state store used by unit tests and local isolated runs."""
@@ -287,6 +296,11 @@ class InMemoryStateStore:
 
     async def close(self) -> None:
         """Release the in-memory store without external resources."""
+
+    async def healthcheck(self) -> bool:
+        """Report that the in-memory state backend is available."""
+
+        return True
 
 
 def create_state_store(

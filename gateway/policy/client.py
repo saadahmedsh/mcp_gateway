@@ -46,6 +46,18 @@ class OpaPolicyClient:
             reason=str(result.get("reason", "")),
         )
 
+    async def healthcheck(self) -> bool:
+        """Check OPA's health endpoint with the configured timeout."""
+
+        health_url = self._url.rsplit("/v1/data/", 1)[0] + "/health"
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                response = await client.get(health_url)
+                response.raise_for_status()
+        except httpx.HTTPError:
+            return False
+        return True
+
 
 class AllowAllPolicyClient:
     """Explicit test adapter that permits calls without external OPA."""
@@ -59,3 +71,8 @@ class AllowAllPolicyClient:
             matched_rule="test_allow_all",
             reason="OPA bypass is enabled only for direct isolated tests",
         )
+
+    async def healthcheck(self) -> bool:
+        """Report that the explicit local test adapter is available."""
+
+        return True

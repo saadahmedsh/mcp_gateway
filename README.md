@@ -4,10 +4,11 @@ A security and reliability control plane between LLM agents and the tools they
 invoke through the Model Context Protocol (MCP).
 
 > **Project status:** Phases 0–7 are implemented, including audit logging,
-> evaluation, packaging, Helm, and CI. The current MCP transport is stdio and
-> gVisor host validation is still pending. The known deployment limitations
-> below must be addressed before connecting this repository to production
-> systems. See [PLAN.md](PLAN.md).
+> evaluation, packaging, Helm, and CI. An authenticated Streamable HTTP
+> entrypoint is now available for Kind/staging experiments, while stdio remains
+> the local default. Dedicated Kubernetes sandbox workers, external TLS-backed
+> services, and replicated immutable audit storage are still required before
+> production use. See [PLAN.md](PLAN.md).
 
 ## Why this project exists
 
@@ -58,10 +59,11 @@ SQLite query runner │ shell executor │ Git workspace
 | 1 | MCP server, registry, and database query tool | Complete |
 | 2 | Redis lifecycle state and OpenTelemetry tracing | Complete |
 | 3 | OPA policy enforcement and human approval | Complete |
-| 4 | gVisor and hardened-Docker execution | In progress |
+| 4 | gVisor and hardened-Docker execution | Implemented with host validation pending |
 | 5 | Bounded repair and retry orchestration | Implemented |
 | 6 | Hash-chained audit and evaluation harness | Implemented |
 | 7 | Container packaging, Helm, and CI | Implemented |
+| 8 | Production hardening and Kind deployment | In progress |
 
 Phase 2 records each call as `received`, `validated`, `policy_checked`,
 `executing`, and a terminal state. It creates a root `tool_call` span plus
@@ -184,6 +186,8 @@ make lint       # Ruff, Black, and strict mypy
 make test       # pytest suite
 make eval       # phase-appropriate evaluation target
 make eval-live  # real MCP + Redis + OPA + sandbox evaluation
+make kind-deploy # build and deploy the HTTP chart to a local Kind cluster
+make kind-down   # delete the local Kind cluster
 ```
 
 Verify a generated audit chain with:
@@ -204,6 +208,26 @@ Render and validate the Kubernetes chart with Helm:
 helm lint deploy/helm/mcp-gateway
 helm template gateway deploy/helm/mcp-gateway
 ```
+
+### Local Kind HTTP smoke test
+
+The Kind target exercises the network entrypoint and Kubernetes probes. Create
+the cluster and load the gateway image with:
+
+```bash
+make kind-deploy
+kubectl get pods,service
+curl --fail http://127.0.0.1:8080/livez
+curl http://127.0.0.1:8080/readyz
+make kind-down
+```
+
+The base chart expects Redis, OPA, and OTLP endpoints to be supplied by the
+cluster or an explicitly configured staging environment. Until those
+dependencies exist, `/readyz` is expected to report `503 unready` while
+`/livez` remains successful. The chart does not mount the Docker socket;
+Kubernetes sandbox execution belongs in the separate worker deployment
+described in the production-readiness report.
 
 Install the Git hooks after creating the environment:
 
@@ -260,9 +284,11 @@ Never commit `.env`, credentials, tokens, private keys, or production data.
 | Stdio process crash | MCP connection terminates | Run supervised workers with restart and drain semantics |
 | Single-node audit file loss | Local evidence is unavailable | Replicate hash-chained records to WORM/object storage |
 
-The current deployment chart uses the stdio server with exec-based health
-probes. A network-facing MCP transport, external secret manager, HA Redis/OPA,
-and durable remote audit sink are deliberate follow-up improvements.
+The local deployment still supports the stdio server. The chart also supports
+the Streamable HTTP entrypoint and HTTP health probes for Kind and staging
+experiments; external secret management, a dedicated sandbox worker, HA
+Redis/OPA, and a durable remote audit sink remain deliberate follow-up
+improvements.
 
 See the full release gate and evidence in
 [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md).
