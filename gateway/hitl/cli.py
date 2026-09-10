@@ -18,7 +18,7 @@ async def _run() -> None:
     )
     try:
         pending = await queue.list_pending()
-        for request in pending:
+        for request in sorted(pending, key=lambda item: item.created_at, reverse=True):
             print(
                 f"{request.approval_id} tool={request.tool_name} "
                 f"created_at={request.created_at.isoformat()} "
@@ -49,6 +49,7 @@ async def _run() -> None:
             args.approver,
             args.reason,
         )
+        print(f"Recorded {args.decision} decision for {args.approval_id}")
     finally:
         await queue.close()
 
