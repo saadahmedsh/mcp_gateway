@@ -65,6 +65,17 @@ class RepairFailure(StrEnum):
     TOOL_ERROR = "tool_error"
 
 
+class RepairAttemptRecord(StrictModel):
+    """Evidence for one model-guided argument repair proposal."""
+
+    category: RepairFailure
+    original_arguments: dict[str, Any]
+    proposed_arguments: dict[str, Any]
+    validation_passed: bool
+    policy_outcome: str | None = None
+    outcome: str
+
+
 class ToolCallRecord(StrictModel):
     """Durable state and attempt history for one tool invocation."""
 
@@ -141,6 +152,7 @@ class AuditRecord(StrictModel):
     approver_identity: str | None
     sandbox_runtime: str
     attempts: list[AttemptRecord]
+    repair_attempts: list[RepairAttemptRecord] = Field(default_factory=list)
     outcome: str
     duration_ms: float
     previous_hash: str

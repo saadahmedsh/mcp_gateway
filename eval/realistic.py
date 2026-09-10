@@ -6,6 +6,7 @@ import json
 import os
 import statistics
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -35,6 +36,38 @@ def _write_report(path: Path, report: dict[str, Any]) -> None:
     path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
 
 
+def _category_breakdown(results: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Summarize observed correctness by scenario category."""
+
+    breakdown: dict[str, dict[str, Any]] = {}
+    for result in results:
+        category = str(result["category"])
+        entry = breakdown.setdefault(category, {"count": 0, "passed": 0, "failed": 0})
+        entry["count"] += 1
+        if result["passed"]:
+            entry["passed"] += 1
+        else:
+            entry["failed"] += 1
+    for entry in breakdown.values():
+        entry["pass_rate"] = entry["passed"] / entry["count"]
+    return breakdown
+
+
+def _read_last_audit(path: Path) -> tuple[list[dict[str, Any]], int]:
+    """Read repair evidence and attempt count from the latest audit record."""
+
+    if not path.exists():
+        return [], 1
+    lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line]
+    if not lines:
+        return [], 1
+    payload = json.loads(lines[-1])
+    value = payload.get("repair_attempts", [])
+    attempts = payload.get("attempts", [])
+    attempt_count = len(attempts) if isinstance(attempts, list) else 1
+    return (value if isinstance(value, list) else []), attempt_count
+
+
 async def run_realistic_evaluation(
     seed: int = 20260910,
     repetitions: int = 5,
@@ -43,46 +76,58 @@ async def run_realistic_evaluation(
     """Execute generated scenarios against one live gateway process."""
 
     scenarios = generate_scenarios(seed, repetitions)
-    environment = os.environ.copy()
-    environment.update(
-        {
-            "GATEWAY_ENVIRONMENT": "development",
-            "GATEWAY_STATE_STORE_BACKEND": "redis",
-            "GATEWAY_APPROVAL_TIMEOUT_SECONDS": "2",
-        }
-    )
-    server = StdioServerParameters(
-        command=sys.executable,
-        args=["-m", "gateway.server"],
-        cwd=Path.cwd(),
-        env=environment,
-    )
-    results: list[dict[str, Any]] = []
-    async with stdio_client(server) as (read_stream, write_stream):
-        async with ClientSession(read_stream, write_stream) as session:
-            await session.initialize()
-            for scenario in scenarios:
-                started = time.perf_counter()
-                result = await session.call_tool(
-                    str(scenario["tool"]),
-                    dict(scenario["arguments"]),
-                    read_timeout_seconds=30,
-                )
-                observed = "succeeded" if not result.is_error else "blocked"
-                results.append(
-                    {
-                        "name": scenario["name"],
-                        "category": scenario["category"],
-                        "expected": scenario["expected"],
-                        "observed": observed,
-                        "passed": observed == scenario["expected"],
-                        "latency_ms": (time.perf_counter() - started) * 1000,
-                    }
-                )
+    with tempfile.TemporaryDirectory(prefix="mcp-realistic-") as directory:
+        audit_path = Path(directory) / "audit.jsonl"
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "GATEWAY_ENVIRONMENT": "development",
+                "GATEWAY_STATE_STORE_BACKEND": "redis",
+                "GATEWAY_APPROVAL_TIMEOUT_SECONDS": "2",
+                "GATEWAY_AUDIT_LOG_PATH": str(audit_path),
+            }
+        )
+        server = StdioServerParameters(
+            command=sys.executable,
+            args=["-m", "gateway.server"],
+            cwd=Path.cwd(),
+            env=environment,
+        )
+        results: list[dict[str, Any]] = []
+        async with stdio_client(server) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                for scenario in scenarios:
+                    started = time.perf_counter()
+                    result = await session.call_tool(
+                        str(scenario["tool"]),
+                        dict(scenario["arguments"]),
+                        read_timeout_seconds=30,
+                    )
+                    observed = "succeeded" if not result.is_error else "blocked"
+                    repair_attempts, attempt_count = _read_last_audit(audit_path)
+                    results.append(
+                        {
+                            "name": scenario["name"],
+                            "category": scenario["category"],
+                            "arguments": scenario["arguments"],
+                            "expected": scenario["expected"],
+                            "observed": observed,
+                            "passed": observed == scenario["expected"],
+                            "latency_ms": (time.perf_counter() - started) * 1000,
+                            "attempt_count": attempt_count,
+                            "repair_attempts": repair_attempts,
+                        }
+                    )
     latencies = [float(item["latency_ms"]) for item in results]
     malformed = [item for item in results if item["category"] == "malformed"]
     destructive = [item for item in results if item["category"] == "destructive"]
     adversarial = [item for item in results if item["category"] == "adversarial"]
+    successful_attempts = [
+        int(item["attempt_count"])
+        for item in results
+        if item["observed"] == "succeeded"
+    ]
     report = {
         "run": {
             "seed": seed,
@@ -99,6 +144,9 @@ async def run_realistic_evaluation(
             ),
             "malformed_repaired_count": sum(1 for item in malformed if item["passed"]),
             "malformed_scenario_count": len(malformed),
+            "mean_attempts_to_success": (
+                statistics.mean(successful_attempts) if successful_attempts else 0.0
+            ),
             "policy_gate_accuracy_percent": (
                 100.0 if all(item["passed"] for item in destructive) else 0.0
             ),
@@ -109,6 +157,7 @@ async def run_realistic_evaluation(
             "latency_mean_ms": statistics.mean(latencies) if latencies else 0.0,
             "latency_p50_ms": _percentile(latencies, 0.50) if latencies else 0.0,
             "latency_p95_ms": _percentile(latencies, 0.95) if latencies else 0.0,
+            "category_breakdown": _category_breakdown(results),
         },
         "results": results,
     }

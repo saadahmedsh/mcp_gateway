@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import AnyHttpUrl, RedisDsn, SecretStr
+from pydantic import AliasChoices, AnyHttpUrl, Field, RedisDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,9 +35,19 @@ class Settings(BaseSettings):
     sandbox_startup_timeout_seconds: float = 30.0
     audit_log_path: Path = Path("data/audit.jsonl")
     repair_enabled: bool = False
+    repair_llm_provider: Literal["openai_compatible", "anthropic"] = "openai_compatible"
     repair_llm_url: AnyHttpUrl = AnyHttpUrl("http://localhost:4000/v1/chat/completions")
     repair_llm_model: str = "repair-model"
-    repair_llm_api_key: SecretStr | None = None
+    repair_llm_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "REPAIR_LLM_API_KEY",
+            "GATEWAY_REPAIR_LLM_API_KEY",
+            "ANTHROPIC_API_KEY",
+        ),
+    )
+    repair_llm_anthropic_version: str = "2023-06-01"
+    repair_llm_max_tokens: int = 1024
     repair_llm_timeout_seconds: float = 15.0
     http_host: str = "0.0.0.0"
     http_port: int = 8080

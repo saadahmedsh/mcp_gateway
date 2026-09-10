@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from gateway.models import AttemptRecord, AuditRecord
+from gateway.models import AttemptRecord, AuditRecord, RepairAttemptRecord
 
 _GENESIS_HASH = "0" * 64
 
@@ -97,6 +97,7 @@ class AuditLogger:
         approver_identity: str | None,
         sandbox_runtime: str,
         attempts: list[AttemptRecord],
+        repair_attempts: list[RepairAttemptRecord] | None = None,
         outcome: str,
         duration_ms: float,
         timestamp: datetime | None = None,
@@ -115,6 +116,7 @@ class AuditLogger:
             "approver_identity": approver_identity,
             "sandbox_runtime": sandbox_runtime,
             "attempts": attempts,
+            "repair_attempts": repair_attempts or [],
             "outcome": outcome,
             "duration_ms": duration_ms,
         }

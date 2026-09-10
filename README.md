@@ -96,7 +96,8 @@ measurements; production transport and sandbox measurements remain separate
 smoke checks.
 
 When `GATEWAY_REPAIR_ENABLED=true` and an API key is configured, malformed
-arguments are repaired by the configured OpenAI-compatible model. The model
+arguments are repaired by the configured OpenAI-compatible or native Anthropic
+Messages API model. The model
 receives the exact Pydantic schema and validation diagnosis and must return a
 JSON argument object. The gateway validates and rechecks policy before every
 repaired attempt. Policy denials are never sent for repair; non-idempotent
@@ -275,6 +276,12 @@ by Git; `.env.example` contains safe defaults.
 | `GATEWAY_JAEGER_UI_URL` | `http://localhost:16686` | Jaeger UI |
 | `GATEWAY_DATABASE_PATH` | `data/gateway.sqlite` | Synthetic SQLite database |
 | `GATEWAY_APPROVAL_TIMEOUT_SECONDS` | `300` | Human approval timeout |
+| `GATEWAY_REPAIR_ENABLED` | `false` | Enable model-guided repair |
+| `GATEWAY_REPAIR_LLM_PROVIDER` | `openai_compatible` | Repair provider |
+| `GATEWAY_REPAIR_LLM_URL` | `http://localhost:4000/v1/chat/completions` | Repair API endpoint |
+| `GATEWAY_REPAIR_LLM_MODEL` | `repair-model` | Provider-specific model identifier |
+| `GATEWAY_REPAIR_LLM_ANTHROPIC_VERSION` | `2023-06-01` | Anthropic API version header |
+| `GATEWAY_REPAIR_LLM_MAX_TOKENS` | `1024` | Maximum repair response tokens |
 | `GATEWAY_SANDBOX_RUNTIME` | `hardened-docker` | `hardened-docker` or `gvisor` |
 | `GATEWAY_SANDBOX_IMAGE` | `mcp-gateway-tool:local` | Tool image used for isolated calls |
 | `GATEWAY_SANDBOX_OUTPUT_LIMIT_BYTES` | `1048576` | Maximum combined stream size per stream |

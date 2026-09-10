@@ -10,7 +10,7 @@ from mcp import types
 from gateway.config import Settings
 from gateway.models import PolicyDecision, RepairFailure
 from gateway.policy.decisions import ALLOW, DENY
-from gateway.repair.advisor import LLMRepairAdvisor
+from gateway.repair.advisor import AnthropicRepairAdvisor, LLMRepairAdvisor
 from gateway.repair.diagnose import FailureDiagnosis
 from gateway.server import create_registry, execute_tool_call
 from gateway.state.redis_store import InMemoryStateStore
@@ -49,6 +49,35 @@ class _Client:
         return _Response()
 
 
+class _AnthropicResponse:
+    """Minimal Anthropic response test double."""
+
+    def raise_for_status(self) -> None:
+        """Report a successful response."""
+
+    def json(self) -> dict[str, Any]:
+        """Return an Anthropic Messages API response."""
+
+        return {"content": [{"type": "text", "text": '{"arguments":{"value":"fixed"}}'}]}
+
+
+class _AnthropicClient:
+    """Minimal async Anthropic HTTP client test double."""
+
+    async def __aenter__(self) -> "_AnthropicClient":
+        """Enter the fake client context."""
+
+        return self
+
+    async def __aexit__(self, *_args: object) -> None:
+        """Leave the fake client context."""
+
+    async def post(self, *_args: object, **_kwargs: object) -> _AnthropicResponse:
+        """Return the deterministic Anthropic response."""
+
+        return _AnthropicResponse()
+
+
 @pytest.mark.asyncio
 async def test_llm_advisor_parses_structured_arguments(
     monkeypatch: pytest.MonkeyPatch,
@@ -57,6 +86,28 @@ async def test_llm_advisor_parses_structured_arguments(
 
     monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: _Client())
     advisor = LLMRepairAdvisor("http://repair.local", "repair-model", "secret", 1.0)
+    repaired = await advisor.repair(
+        "demo",
+        {"value": "bad"},
+        {"type": "object"},
+        FailureDiagnosis(RepairFailure.TYPE_COERCION, "wrong type"),
+    )
+    assert repaired == {"value": "fixed"}
+
+
+@pytest.mark.asyncio
+async def test_anthropic_advisor_parses_messages_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The native Anthropic adapter extracts the structured repair object."""
+
+    monkeypatch.setattr("httpx.AsyncClient", lambda **_kwargs: _AnthropicClient())
+    advisor = AnthropicRepairAdvisor(
+        "https://api.anthropic.com/v1/messages",
+        "claude-model",
+        "secret",
+        1.0,
+    )
     repaired = await advisor.repair(
         "demo",
         {"value": "bad"},

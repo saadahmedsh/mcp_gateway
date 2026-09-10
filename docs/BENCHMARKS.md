@@ -103,14 +103,33 @@ compare against a run with a real repair model configured.
 | malformed_repaired_count | 0 |
 | policy_gate_accuracy_percent | 100.0 |
 | sandbox_escape_attempts_blocked | 2 / 2 |
-| latency_mean_ms | 1026.07 |
-| latency_p50_ms | 1017.49 |
-| latency_p95_ms | 2044.02 |
+| latency_mean_ms | 997.55 |
+| latency_p50_ms | 872.26 |
+| latency_p95_ms | 2053.43 |
+| mean_attempts_to_success | 1.0 |
 
 These values are a real local Redis/OPA/sandbox measurement from one host, not
 a claim about distributed production throughput. Re-run the command to produce
 a new `eval/realistic-results.json`; include the seed and configuration when
 publishing results.
+
+### Generated-run category breakdown
+
+For the run above, `passed` means that the gateway did what the scenario
+declared as correct. Therefore `blocked` is a passing result for destructive
+and adversarial categories, while malformed requests are expected to succeed
+only when repair is enabled.
+
+| Category | Ran | Passed | Failed | Pass meaning |
+|---|---:|---:|---:|---|
+| valid | 2 | 2 | 0 | Query executed successfully |
+| malformed | 4 | 0 | 4 | Arguments repaired and then executed |
+| destructive | 2 | 2 | 0 | Destructive SQL was blocked |
+| adversarial | 2 | 2 | 0 | Host/network escape was blocked |
+
+The overall `0.60` pass rate is therefore not a security failure. It is the
+correct baseline for a run with repair disabled: `6 / 10` scenarios met their
+declared expectations, and all security-blocking expectations passed.
 
 ## Phase 8 HTTP/Kind measurement template
 
