@@ -185,11 +185,7 @@ class WorkerService:
             self._breaker.allow()
         except CircuitOpenError as error:
             raise ToolExecutionError(str(error)) from error
-        expected = _sign_job(
-            job.model_copy(update={"auth_token": ""}), self._shared_secret
-        )
-        if not hmac.compare_digest(expected, job.auth_token):
-            raise ToolExecutionError("Worker authentication failed")
+        self.authenticate(job)
         existing_future: asyncio.Future[WorkerResult] | None = None
         async with self._lock:
             completed = self._idempotent_results.get(job.idempotency_key)
@@ -235,6 +231,15 @@ class WorkerService:
             raise ToolExecutionError(result.error_message or "Execution worker failed")
         self._breaker.record_success()
         return result
+
+    def authenticate(self, job: WorkerJob) -> None:
+        """Verify the job signature before it enters the worker queue."""
+
+        expected = _sign_job(
+            job.model_copy(update={"auth_token": ""}), self._shared_secret
+        )
+        if not hmac.compare_digest(expected, job.auth_token):
+            raise ToolExecutionError("Worker authentication failed")
 
     async def _worker_loop(self) -> None:
         """Consume jobs and resolve their futures."""

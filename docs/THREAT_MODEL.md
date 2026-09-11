@@ -27,10 +27,11 @@ boundaries.
   execution history, and idempotency records. Redis is limited to ephemeral
   coordination and waiting signals.
 - Queued worker mode separates scheduling from tool execution and authenticates
-  every job with HMAC. The current local implementation keeps the worker
-  component in the gateway process; production deployment must move it to a
-  separate service on dedicated runtime nodes. The gateway must never receive a
-  host Docker socket in that deployment.
+  every job with HMAC. Remote mode moves the same protocol to
+  `gateway.workers.http_server` as a separate service. Production deployment
+  must place it on dedicated gVisor/Kata runtime nodes, protect its network
+  endpoint with TLS and network policy, and keep the gateway free of any host
+  Docker socket.
 - Audit records are replicated to immutable storage in compliance mode and are
   verified using the hash chain before they are accepted as evidence.
 

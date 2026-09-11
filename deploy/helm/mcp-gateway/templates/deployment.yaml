@@ -76,6 +76,19 @@ spec:
               value: {{ .Values.gateway.httpSessionIdleTimeoutSeconds | quote }}
             - name: GATEWAY_HTTP_MAX_SESSIONS
               value: {{ .Values.gateway.httpMaxSessions | quote }}
+            - name: GATEWAY_WORKER_MODE
+              value: {{ .Values.gateway.workerMode | quote }}
+            - name: GATEWAY_WORKER_URL
+              value: {{ .Values.gateway.workerUrl | quote }}
+            - name: GATEWAY_WORKER_REQUEST_TIMEOUT_SECONDS
+              value: {{ .Values.gateway.workerRequestTimeoutSeconds | quote }}
+            {{- if or .Values.gateway.workerSharedSecret .Values.worker.existingSecret }}
+            - name: GATEWAY_WORKER_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default (printf "%s-worker-auth" (include "mcp-gateway.fullname" .)) .Values.worker.existingSecret }}
+                  key: {{ .Values.worker.existingSecretKey | quote }}
+            {{- end }}
             {{- if .Values.gateway.httpAuthToken }}
             - name: GATEWAY_HTTP_AUTH_TOKEN
               valueFrom:

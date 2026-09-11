@@ -417,3 +417,23 @@ CLI has a portable `--runtime-flag` option.
 - **Trade-off:** The local mode is not yet a kernel-level process boundary.
   Dedicated worker deployment and runtime isolation remain required before
   production traffic.
+
+## ADR-0035: Externalize the worker protocol as a separate HTTP service
+
+- **Status:** Accepted during Stage D hardening
+- **Decision:** Keep the typed HMAC job envelope and expose it through a
+  standalone `gateway.workers.http_server` service. The gateway's `remote`
+  mode uses an HTTP client and never constructs a sandbox runner. The Helm
+  chart defines a separate worker Deployment and ClusterIP Service with an
+  optional gVisor/Kata `RuntimeClass`.
+- **Reason:** A process and network boundary is required before Kubernetes can
+  place execution on dedicated sandbox nodes. Keeping one protocol avoids
+  divergent local and production behavior and preserves idempotency and
+  reconciliation semantics.
+- **Rejected:** Mounting `/var/run/docker.sock` into the gateway, because it
+  grants effective host-root control. Running the worker as a sidecar, because
+  it does not provide independent scheduling or node isolation.
+- **Trade-off:** The HTTP service is deployable now, but the actual production
+  sandbox must be supplied by a runtime-native gVisor/Kata adapter or an
+  explicitly isolated transitional worker. The chart therefore disables the
+  worker by default and requires an explicit shared secret when enabled.

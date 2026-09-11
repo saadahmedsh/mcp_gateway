@@ -5,10 +5,11 @@ invoke through the Model Context Protocol (MCP).
 
 > **Project status:** Phases 0–8 provide the secure gateway, authenticated
 > Streamable HTTP staging entrypoint, sandbox controls, repair loop, audit
-> chain, evaluation harness, Helm chart, and Kind verification. The next
-> deployment-ready stages add OIDC/RBAC and tenant context, PostgreSQL control-
-> plane persistence, dedicated sandbox workers, immutable remote audit storage,
-> and hardened service integrations. Local Compose and Kind environments are
+> chain, evaluation harness, Helm chart, Kind verification, and a separately
+> deployable authenticated worker service. The next deployment-ready stages
+> add OIDC/RBAC and tenant context, runtime-native gVisor/Kata sandboxing,
+> immutable remote audit storage, and hardened service integrations. Local
+> Compose and Kind environments are
 > production-shaped test environments, not a substitute for HA cloud
 > operations. See [PLAN.md](PLAN.md) and
 > [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md).
@@ -72,7 +73,7 @@ SQLite query runner │ shell executor │ Git workspace
 | A | Documentation and scope expansion | Complete |
 | B | JWT/OIDC foundation, RBAC vocabulary, tenant-aware policy context | Implemented foundation |
 | C | PostgreSQL control-plane persistence and migrations | Implemented foundation |
-| D | Authenticated worker queue, bounded execution, reconciliation | Implemented foundation |
+| D | Authenticated worker queue, remote worker service, reconciliation | Implemented; runtime adapter deployment remains |
 | E–F | Evaluation gates, production integrations | Planned |
 
 Phase 2 records each call as `received`, `validated`, `policy_checked`,
@@ -276,7 +277,17 @@ by idempotency key. A stopped worker never causes an uncertain mutation to be
 reported as successful; it creates a `needs_review` reconciliation record.
 The local queued service is an execution-boundary test. Production Kubernetes
 deployments must run the worker as a separate service on dedicated sandbox
-nodes.
+nodes. The repository now includes that service and an authenticated remote
+client. Configure `GATEWAY_WORKER_MODE=remote`, set `GATEWAY_WORKER_URL` and
+`GATEWAY_WORKER_SHARED_SECRET` through an external Secret, and run
+`python -m gateway.workers.http_server` for the worker. The worker owns the
+sandbox runner and exposes `/jobs`, `/livez`, and `/readyz`; the gateway has no
+Docker socket. Set `worker.runtimeClassName` to the cluster's gVisor or Kata
+`RuntimeClass`. The chart keeps the worker disabled by default because the
+runtime-native sandbox adapter and node policy are deployment-specific. For
+production, set `worker.existingSecret` and `worker.existingSecretKey` to a
+Secret managed outside Helm; `gateway.workerSharedSecret` is only a local
+development fallback.
 
 To measure model-guided repair, set `GATEWAY_REPAIR_ENABLED=true` and provide
 the OpenAI-compatible endpoint, model, and API key through the ignored `.env`
@@ -357,13 +368,17 @@ by Git; `.env.example` contains safe defaults.
 | `GATEWAY_CONTROL_PLANE_POOL_SIZE` | `5` | PostgreSQL connection pool size |
 | `GATEWAY_CONTROL_PLANE_MAX_OVERFLOW` | `10` | Additional PostgreSQL connections |
 | `GATEWAY_CONTROL_PLANE_CONNECT_TIMEOUT_SECONDS` | `3.0` | PostgreSQL connection timeout |
-| `GATEWAY_WORKER_MODE` | `in_process` | `in_process` or bounded `queued` execution |
+| `GATEWAY_WORKER_MODE` | `in_process` | `in_process`, bounded `queued`, or authenticated `remote` execution |
+| `GATEWAY_WORKER_URL` | unset | Worker service base URL used by `remote` mode |
+| `GATEWAY_WORKER_REQUEST_TIMEOUT_SECONDS` | `120.0` | Remote worker request deadline |
 | `GATEWAY_WORKER_SHARED_SECRET` | unset | HMAC secret for gateway-worker jobs |
 | `GATEWAY_WORKER_MAX_CONCURRENCY` | `4` | Maximum simultaneous worker jobs |
 | `GATEWAY_WORKER_QUEUE_SIZE` | `128` | Maximum queued jobs |
 | `GATEWAY_WORKER_JOB_TIMEOUT_SECONDS` | `120.0` | Gateway wait limit per job |
 | `GATEWAY_WORKER_FAILURE_THRESHOLD` | `3` | Failures before circuit opens |
 | `GATEWAY_WORKER_RESET_TIMEOUT_SECONDS` | `30.0` | Circuit cool-down |
+| `GATEWAY_WORKER_HOST` | `0.0.0.0` | Standalone worker bind address |
+| `GATEWAY_WORKER_PORT` | `8090` | Standalone worker listen port |
 | `GATEWAY_APPROVAL_TIMEOUT_SECONDS` | `300` | Human approval timeout |
 | `GATEWAY_REPAIR_ENABLED` | `false` | Enable model-guided repair |
 | `GATEWAY_REPAIR_LLM_PROVIDER` | `openai_compatible` | Repair provider |

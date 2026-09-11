@@ -392,7 +392,7 @@ and optional runtime persistence controlled by
 checks remain runnable without a database. Backups, restore drills, HA, and
 remote PostgreSQL operations remain Stage F deployment work.
 
-#### Stage D — Dedicated execution workers (implemented foundation)
+#### Stage D — Dedicated execution workers (remote service implemented; runtime hardening remains)
 
 - Move tool execution behind an authenticated job protocol and worker queue.
 - Keep the gateway free of Docker-socket and privileged access.
@@ -400,14 +400,16 @@ remote PostgreSQL operations remain Stage F deployment work.
 - Add bounded concurrency, circuit breakers, idempotency keys, reconciliation,
   and crash recovery for mutating operations.
 
-The repository now includes an authenticated HMAC job protocol, a bounded
+The repository includes an authenticated HMAC job protocol, a bounded
 worker queue, worker-owned registry execution, circuit breaking, idempotency
 deduplication, and explicit `needs_review` reconciliation records when a
 worker stops or a mutation outcome becomes uncertain. `GATEWAY_WORKER_MODE=queued`
-enables the boundary locally. The current implementation runs the worker
-service as a separate asyncio-owned execution component in the gateway process;
-the next deployment step is moving that same protocol to a separately deployed
-worker process or service with gVisor/Kata node isolation.
+enables the boundary locally. `GATEWAY_WORKER_MODE=remote` uses the same
+protocol over HTTP, and `gateway.workers.http_server` is a separately
+deployable worker service. The Helm chart can schedule that service with a
+gVisor/Kata `RuntimeClass`; a production runtime adapter must provide the
+actual sandbox capability on dedicated nodes. The gateway never receives a
+Docker socket.
 
 #### Stage E — Evaluation as a deployment gate
 

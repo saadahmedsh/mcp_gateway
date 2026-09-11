@@ -7,7 +7,7 @@ Review date: 2026-09-10
 | Area | Result | Evidence |
 |---|---|---|
 | Formatting, lint, and typing | Pass | `make lint` |
-| Automated tests | Pass | `make test` — 45 passed, 3 skipped in 3.16s; PostgreSQL integration is opt-in |
+| Automated tests | Pass | `make test` — 51 passed, 3 skipped in 3.63s; PostgreSQL integration is opt-in |
 | Pre-commit hooks | Pass | Ruff, Black, and mypy hooks passed |
 | Rego policy tests | Pass | `opa test gateway/policy/policies` — 9/9 |
 | Offline evaluation | Pass | `make eval` — 7/7 scenarios |
@@ -26,9 +26,11 @@ These items should be resolved before production traffic is permitted:
 1. The gateway now exposes an authenticated Streamable HTTP entrypoint for Kind
    and staging. Production still requires OIDC or mTLS authentication,
    ingress/TLS termination, and a load-tested network deployment.
-2. The local queued worker boundary is implemented, but Kubernetes production
-   still requires a separately deployed authenticated worker service or a
-   Kubernetes-native runtime. The gateway must not receive a Docker socket.
+2. The authenticated worker HTTP service and Helm Deployment/Service are now
+   implemented. Production still requires dedicated gVisor/Kata nodes, a
+   runtime-native sandbox adapter, network policy/TLS between gateway and
+   worker, and an operationally managed shared secret. The gateway must not
+   receive a Docker socket.
 3. Redis, OPA, and OTLP defaults use plaintext local URLs. Production requires
    TLS, authentication, network policies, and dependency health checks.
 4. The audit sink is a local JSONL file. Compliance deployments need replicated
@@ -61,8 +63,9 @@ These items should be resolved before production traffic is permitted:
 - Run PostgreSQL migrations, transaction tests, backup/restore drills, and
   disaster-recovery verification for durable control-plane records while
   retaining Redis for coordination.
-- Add a dedicated authenticated sandbox-worker service with idempotency,
-  reconciliation, bounded concurrency, and crash recovery.
+- Validate the separately deployed authenticated sandbox-worker service on
+  dedicated gVisor/Kata nodes with idempotency, reconciliation, bounded
+  concurrency, crash recovery, TLS, and network policy.
 - Make policy bundles versioned, signed, loaded by OPA, and auditable.
 
 ## Decision

@@ -171,13 +171,16 @@ def create_http_app(settings: Settings | None = None) -> ASGIApp:
     sandbox_runner = (
         None
         if active_settings.environment == "test"
+        or active_settings.worker_mode == "remote"
         else SandboxRunner(
             active_settings.sandbox_runtime,
             active_settings.sandbox_image,
             active_settings.sandbox_output_limit_bytes,
         )
     )
-    registry, worker_service = create_execution_runtime(active_settings, sandbox_runner)
+    registry, worker_service, remote_worker = create_execution_runtime(
+        active_settings, sandbox_runner
+    )
     server: Server[dict[str, Any]] = create_mcp_server(
         registry,
         state_store=state_store,
@@ -214,7 +217,7 @@ def create_http_app(settings: Settings | None = None) -> ASGIApp:
         worker_healthcheck = (
             getattr(worker_service, "healthcheck", None)
             if worker_service is not None
-            else None
+            else getattr(remote_worker, "healthcheck", None)
         )
         checks = {
             "state_store": (
@@ -264,6 +267,8 @@ def create_http_app(settings: Settings | None = None) -> ASGIApp:
         finally:
             if worker_service is not None:
                 await worker_service.stop()
+            if remote_worker is not None:
+                await remote_worker.close()
             await state_store.close()
             await approval_queue.close()
             if control_plane is not None:

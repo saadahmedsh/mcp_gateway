@@ -66,6 +66,7 @@ from gateway.stdio_transport import asyncio_stdio_server
 from gateway.tools.db_query import create_db_query_tool, seed_database
 from gateway.tools.shell_exec import create_shell_exec_tool
 from gateway.tracing.otel import TracingManager, configure_logging, create_tracing
+from gateway.workers.remote import RemoteWorkerClient
 from gateway.workers.service import (
     InProcessWorkerClient,
     WorkerService,
@@ -90,11 +91,27 @@ def create_registry(
 def create_execution_runtime(
     settings: Settings,
     sandbox_runner: SandboxRunner | None,
-) -> tuple[ToolRegistry, WorkerService | None]:
+) -> tuple[ToolRegistry, WorkerService | None, RemoteWorkerClient | None]:
     """Create the gateway registry and optional bounded worker service."""
 
     if settings.worker_mode == "in_process":
-        return create_registry(settings, sandbox_runner), None
+        return create_registry(settings, sandbox_runner), None, None
+    if settings.worker_mode == "remote":
+        if settings.worker_shared_secret is None or settings.worker_url is None:
+            raise ValueError(
+                "Remote worker mode requires GATEWAY_WORKER_URL and "
+                "GATEWAY_WORKER_SHARED_SECRET"
+            )
+        client = RemoteWorkerClient(
+            str(settings.worker_url),
+            settings.worker_shared_secret.get_secret_value(),
+            settings.worker_request_timeout_seconds,
+        )
+        return (
+            create_worker_proxy_registry(create_registry(settings, None), client),
+            None,
+            client,
+        )
     worker_registry = create_registry(settings, sandbox_runner)
     shared_secret = (
         settings.worker_shared_secret.get_secret_value()
@@ -116,6 +133,7 @@ def create_execution_runtime(
             InProcessWorkerClient(worker_service, shared_secret),
         ),
         worker_service,
+        None,
     )
 
 
@@ -728,6 +746,7 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
     sandbox_runner = (
         None
         if active_settings.environment == "test"
+        or active_settings.worker_mode == "remote"
         else SandboxRunner(
             active_settings.sandbox_runtime,
             active_settings.sandbox_image,
@@ -735,7 +754,9 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
         )
     )
     session_id = uuid4().hex
-    registry, worker_service = create_execution_runtime(active_settings, sandbox_runner)
+    registry, worker_service, remote_worker = create_execution_runtime(
+        active_settings, sandbox_runner
+    )
     if worker_service is not None:
         await worker_service.start()
 
@@ -766,6 +787,8 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
             await control_plane.close()
         if worker_service is not None:
             await worker_service.stop()
+        if remote_worker is not None:
+            await remote_worker.close()
         tracing.force_flush()
         tracing.shutdown()
 

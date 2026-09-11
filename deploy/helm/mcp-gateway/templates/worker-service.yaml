@@ -1,0 +1,17 @@
+{{- if .Values.worker.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mcp-gateway.fullname" . }}-worker
+  labels:
+    {{- include "mcp-gateway.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.worker.service.type }}
+  selector:
+    app.kubernetes.io/name: {{ include "mcp-gateway.name" . }}-worker
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: worker
+      port: {{ .Values.worker.service.port }}
+      targetPort: worker
+{{- end }}

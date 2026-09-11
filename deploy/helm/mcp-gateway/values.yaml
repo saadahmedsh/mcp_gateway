@@ -46,6 +46,47 @@ gateway:
   httpMaxRequestBodyBytes: "4194304"
   httpSessionIdleTimeoutSeconds: "1800"
   httpMaxSessions: "10000"
+  workerMode: in_process
+  workerUrl: http://mcp-gateway-worker:8090
+  workerRequestTimeoutSeconds: "120.0"
+  workerSharedSecret: ""
+
+worker:
+  enabled: false
+  existingSecret: ""
+  existingSecretKey: shared-secret
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8090
+  runtimeClassName: ""
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  image:
+    repository: mcp-gateway
+    tag: latest
+    pullPolicy: IfNotPresent
+  databasePath: /var/lib/mcp-gateway/gateway.sqlite
+  sandboxRuntime: hardened-docker
+  sandboxImage: mcp-gateway-tool:local
+  dockerSocket:
+    enabled: false
+    hostPath: /var/run/docker.sock
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
 
 policyBundles:
   tools.rego: |

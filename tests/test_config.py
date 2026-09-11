@@ -24,12 +24,16 @@ def _clear_gateway_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "GATEWAY_CONTROL_PLANE_MAX_OVERFLOW",
         "GATEWAY_CONTROL_PLANE_CONNECT_TIMEOUT_SECONDS",
         "GATEWAY_WORKER_MODE",
+        "GATEWAY_WORKER_URL",
+        "GATEWAY_WORKER_REQUEST_TIMEOUT_SECONDS",
         "GATEWAY_WORKER_SHARED_SECRET",
         "GATEWAY_WORKER_MAX_CONCURRENCY",
         "GATEWAY_WORKER_QUEUE_SIZE",
         "GATEWAY_WORKER_JOB_TIMEOUT_SECONDS",
         "GATEWAY_WORKER_FAILURE_THRESHOLD",
         "GATEWAY_WORKER_RESET_TIMEOUT_SECONDS",
+        "GATEWAY_WORKER_HOST",
+        "GATEWAY_WORKER_PORT",
         "GATEWAY_APPROVAL_TIMEOUT_SECONDS",
         "GATEWAY_SANDBOX_RUNTIME",
         "GATEWAY_AUDIT_LOG_PATH",
@@ -74,6 +78,9 @@ def test_settings_have_safe_local_defaults(
     assert settings.http_port == 8080
     assert settings.http_path == "/mcp"
     assert settings.http_auth_mode == "none"
+    assert settings.worker_mode == "in_process"
+    assert settings.worker_url is None
+    assert settings.worker_port == 8090
 
 
 def test_settings_can_be_overridden_from_environment(

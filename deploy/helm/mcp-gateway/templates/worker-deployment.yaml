@@ -1,0 +1,100 @@
+{{- if .Values.worker.enabled }}
+{{- if and (not .Values.worker.existingSecret) (not .Values.gateway.workerSharedSecret) }}
+{{- fail "worker.existingSecret or gateway.workerSharedSecret must be set when worker.enabled=true" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mcp-gateway.fullname" . }}-worker
+  labels:
+    {{- include "mcp-gateway.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "mcp-gateway.name" . }}-worker
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "mcp-gateway.name" . }}-worker
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      {{- if .Values.worker.runtimeClassName }}
+      runtimeClassName: {{ .Values.worker.runtimeClassName | quote }}
+      {{- end }}
+      {{- with .Values.worker.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.worker.podSecurityContext | nindent 8 }}
+      containers:
+        - name: worker
+          image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          command: ["python", "-m", "gateway.workers.http_server"]
+          ports:
+            - name: worker
+              containerPort: {{ .Values.worker.service.port }}
+          env:
+            - name: GATEWAY_ENVIRONMENT
+              value: production
+            - name: GATEWAY_WORKER_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default (printf "%s-worker-auth" (include "mcp-gateway.fullname" .)) .Values.worker.existingSecret }}
+                  key: {{ .Values.worker.existingSecretKey | quote }}
+            - name: GATEWAY_DATABASE_PATH
+              value: {{ .Values.worker.databasePath | quote }}
+            - name: GATEWAY_SANDBOX_RUNTIME
+              value: {{ .Values.worker.sandboxRuntime | quote }}
+            - name: GATEWAY_SANDBOX_IMAGE
+              value: {{ .Values.worker.sandboxImage | quote }}
+            - name: GATEWAY_WORKER_HOST
+              value: 0.0.0.0
+            - name: GATEWAY_WORKER_PORT
+              value: {{ .Values.worker.service.port | quote }}
+          {{- if .Values.worker.dockerSocket.enabled }}
+          volumeMounts:
+            - name: worker-data
+              mountPath: /var/lib/mcp-gateway
+            - name: docker-socket
+              mountPath: /var/run/docker.sock
+          {{- else }}
+          volumeMounts:
+            - name: worker-data
+              mountPath: /var/lib/mcp-gateway
+          {{- end }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: worker
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: worker
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: worker-data
+          emptyDir: {}
+      {{- if .Values.worker.dockerSocket.enabled }}
+        - name: docker-socket
+          hostPath:
+            path: {{ .Values.worker.dockerSocket.hostPath }}
+            type: Socket
+      {{- end }}
+{{- end }}
