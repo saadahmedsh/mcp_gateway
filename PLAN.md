@@ -392,13 +392,22 @@ and optional runtime persistence controlled by
 checks remain runnable without a database. Backups, restore drills, HA, and
 remote PostgreSQL operations remain Stage F deployment work.
 
-#### Stage D — Dedicated execution workers
+#### Stage D — Dedicated execution workers (implemented foundation)
 
 - Move tool execution behind an authenticated job protocol and worker queue.
 - Keep the gateway free of Docker-socket and privileged access.
 - Run workers on dedicated nodes with gVisor or Kata where available.
 - Add bounded concurrency, circuit breakers, idempotency keys, reconciliation,
   and crash recovery for mutating operations.
+
+The repository now includes an authenticated HMAC job protocol, a bounded
+worker queue, worker-owned registry execution, circuit breaking, idempotency
+deduplication, and explicit `needs_review` reconciliation records when a
+worker stops or a mutation outcome becomes uncertain. `GATEWAY_WORKER_MODE=queued`
+enables the boundary locally. The current implementation runs the worker
+service as a separate asyncio-owned execution component in the gateway process;
+the next deployment step is moving that same protocol to a separately deployed
+worker process or service with gVisor/Kata node isolation.
 
 #### Stage E — Evaluation as a deployment gate
 

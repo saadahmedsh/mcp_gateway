@@ -7,7 +7,7 @@ Review date: 2026-09-10
 | Area | Result | Evidence |
 |---|---|---|
 | Formatting, lint, and typing | Pass | `make lint` |
-| Automated tests | Pass | `make test` — 40 passed, 3 skipped in 3.42s; PostgreSQL integration is opt-in |
+| Automated tests | Pass | `make test` — 45 passed, 3 skipped in 3.16s; PostgreSQL integration is opt-in |
 | Pre-commit hooks | Pass | Ruff, Black, and mypy hooks passed |
 | Rego policy tests | Pass | `opa test gateway/policy/policies` — 9/9 |
 | Offline evaluation | Pass | `make eval` — 7/7 scenarios |
@@ -26,8 +26,9 @@ These items should be resolved before production traffic is permitted:
 1. The gateway now exposes an authenticated Streamable HTTP entrypoint for Kind
    and staging. Production still requires OIDC or mTLS authentication,
    ingress/TLS termination, and a load-tested network deployment.
-2. Kubernetes does not provide the Docker socket to the gateway. Sandbox calls
-   therefore require a dedicated worker service or a Kubernetes-native runtime.
+2. The local queued worker boundary is implemented, but Kubernetes production
+   still requires a separately deployed authenticated worker service or a
+   Kubernetes-native runtime. The gateway must not receive a Docker socket.
 3. Redis, OPA, and OTLP defaults use plaintext local URLs. Production requires
    TLS, authentication, network policies, and dependency health checks.
 4. The audit sink is a local JSONL file. Compliance deployments need replicated

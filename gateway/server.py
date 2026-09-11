@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import secrets
 import time
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -65,6 +66,13 @@ from gateway.stdio_transport import asyncio_stdio_server
 from gateway.tools.db_query import create_db_query_tool, seed_database
 from gateway.tools.shell_exec import create_shell_exec_tool
 from gateway.tracing.otel import TracingManager, configure_logging, create_tracing
+from gateway.workers.service import (
+    InProcessWorkerClient,
+    WorkerService,
+    create_worker_proxy_registry,
+    reset_worker_context,
+    set_worker_context,
+)
 
 
 def create_registry(
@@ -77,6 +85,38 @@ def create_registry(
     registry.register(create_db_query_tool(settings.database_path, sandbox_runner))
     registry.register(create_shell_exec_tool(sandbox_runner))
     return registry
+
+
+def create_execution_runtime(
+    settings: Settings,
+    sandbox_runner: SandboxRunner | None,
+) -> tuple[ToolRegistry, WorkerService | None]:
+    """Create the gateway registry and optional bounded worker service."""
+
+    if settings.worker_mode == "in_process":
+        return create_registry(settings, sandbox_runner), None
+    worker_registry = create_registry(settings, sandbox_runner)
+    shared_secret = (
+        settings.worker_shared_secret.get_secret_value()
+        if settings.worker_shared_secret is not None
+        else secrets.token_hex(32)
+    )
+    worker_service = WorkerService(
+        worker_registry,
+        shared_secret,
+        max_concurrency=settings.worker_max_concurrency,
+        queue_size=settings.worker_queue_size,
+        job_timeout_seconds=settings.worker_job_timeout_seconds,
+        failure_threshold=settings.worker_failure_threshold,
+        reset_timeout_seconds=settings.worker_reset_timeout_seconds,
+    )
+    return (
+        create_worker_proxy_registry(
+            worker_registry,
+            InProcessWorkerClient(worker_service, shared_secret),
+        ),
+        worker_service,
+    )
 
 
 def _annotations_for(
@@ -489,7 +529,16 @@ async def execute_tool_call(
                         ),
                     ):
                         validated = registry.validate(tool_name, arguments)
-                        result = await registry.execute_validated(tool_name, validated)
+                        worker_context = set_worker_context(
+                            call_id,
+                            principal.tenant_id if principal else "local",
+                        )
+                        try:
+                            result = await registry.execute_validated(
+                                tool_name, validated
+                            )
+                        finally:
+                            reset_worker_context(worker_context)
                     await state_store.finish_attempt(
                         call_id, attempt_number, "succeeded"
                     )
@@ -686,7 +735,9 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
         )
     )
     session_id = uuid4().hex
-    registry = create_registry(active_settings, sandbox_runner)
+    registry, worker_service = create_execution_runtime(active_settings, sandbox_runner)
+    if worker_service is not None:
+        await worker_service.start()
 
     server = create_mcp_server(
         registry,
@@ -713,6 +764,8 @@ async def run_stdio_server(settings: Settings | None = None) -> None:
         await approval_queue.close()
         if control_plane is not None:
             await control_plane.close()
+        if worker_service is not None:
+            await worker_service.stop()
         tracing.force_flush()
         tracing.shutdown()
 

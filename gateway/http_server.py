@@ -29,7 +29,7 @@ from gateway.repair.advisor import (
     RepairAdvisor,
 )
 from gateway.sandbox.runner import SandboxRunner
-from gateway.server import create_mcp_server, create_registry
+from gateway.server import create_execution_runtime, create_mcp_server
 from gateway.state.redis_store import create_state_store
 from gateway.tools.db_query import seed_database
 from gateway.tracing.otel import configure_logging, create_tracing
@@ -177,7 +177,7 @@ def create_http_app(settings: Settings | None = None) -> ASGIApp:
             active_settings.sandbox_output_limit_bytes,
         )
     )
-    registry = create_registry(active_settings, sandbox_runner)
+    registry, worker_service = create_execution_runtime(active_settings, sandbox_runner)
     server: Server[dict[str, Any]] = create_mcp_server(
         registry,
         state_store=state_store,
@@ -211,6 +211,11 @@ def create_http_app(settings: Settings | None = None) -> ASGIApp:
             if control_plane is not None
             else None
         )
+        worker_healthcheck = (
+            getattr(worker_service, "healthcheck", None)
+            if worker_service is not None
+            else None
+        )
         checks = {
             "state_store": (
                 bool(await state_healthcheck()) if callable(state_healthcheck) else True
@@ -223,6 +228,11 @@ def create_http_app(settings: Settings | None = None) -> ASGIApp:
             "control_plane": (
                 bool(await control_plane_healthcheck())
                 if callable(control_plane_healthcheck)
+                else True
+            ),
+            "worker": (
+                bool(await worker_healthcheck())
+                if callable(worker_healthcheck)
                 else True
             ),
         }
@@ -246,10 +256,14 @@ def create_http_app(settings: Settings | None = None) -> ASGIApp:
         """Initialize and close gateway dependencies with the HTTP app."""
 
         await seed_database(active_settings.database_path)
+        if worker_service is not None:
+            await worker_service.start()
         try:
             async with original_lifespan(app):
                 yield
         finally:
+            if worker_service is not None:
+                await worker_service.stop()
             await state_store.close()
             await approval_queue.close()
             if control_plane is not None:

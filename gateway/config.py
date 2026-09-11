@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     control_plane_pool_size: int = 5
     control_plane_max_overflow: int = 10
     control_plane_connect_timeout_seconds: float = 3.0
+    worker_mode: Literal["in_process", "queued"] = "in_process"
+    worker_shared_secret: SecretStr | None = None
+    worker_max_concurrency: int = 4
+    worker_queue_size: int = 128
+    worker_job_timeout_seconds: float = 120.0
+    worker_failure_threshold: int = 3
+    worker_reset_timeout_seconds: float = 30.0
     state_store_backend: Literal["redis", "memory"] = "redis"
     redis_operation_timeout_seconds: float = 2.0
     state_ttl_seconds: int = 86_400

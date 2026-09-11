@@ -38,6 +38,7 @@ async def test_health_endpoints_report_status(tmp_path: Path) -> None:
             "state_store": True,
             "policy": True,
             "control_plane": True,
+            "worker": True,
         }
 
 

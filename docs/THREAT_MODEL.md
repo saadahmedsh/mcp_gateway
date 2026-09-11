@@ -26,8 +26,11 @@ boundaries.
 - PostgreSQL is the durable source of truth for principals, approvals,
   execution history, and idempotency records. Redis is limited to ephemeral
   coordination and waiting signals.
-- Sandbox workers are separated from the gateway and run with a dedicated
-  runtime boundary. The gateway never receives a host Docker socket.
+- Queued worker mode separates scheduling from tool execution and authenticates
+  every job with HMAC. The current local implementation keeps the worker
+  component in the gateway process; production deployment must move it to a
+  separate service on dedicated runtime nodes. The gateway must never receive a
+  host Docker socket in that deployment.
 - Audit records are replicated to immutable storage in compliance mode and are
   verified using the hash chain before they are accepted as evidence.
 

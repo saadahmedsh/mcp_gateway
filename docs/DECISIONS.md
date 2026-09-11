@@ -396,3 +396,24 @@ CLI has a portable `--runtime-flag` option.
 - **Trade-off:** A local deployment now has one additional service and a
   migration release step. The benefit is explicit transactional ownership and
   a path to managed PostgreSQL, HA, backups, and restore verification.
+
+## ADR-0034: Use an authenticated bounded worker queue before externalizing workers
+
+- **Status:** Accepted during Stage D
+- **Decision:** Introduce a typed HMAC-authenticated job protocol and bounded
+  worker queue. Worker-owned registries execute tools, while the gateway submits
+  jobs through a client boundary. Add circuit breaking, idempotency
+  deduplication, and reconciliation records for uncertain mutations. The local
+  implementation runs the worker service as a separate asyncio component;
+  production moves it to a separately deployed service.
+- **Reason:** This isolates scheduling and execution responsibilities while
+  keeping local development reproducible. HMAC prevents an untrusted caller
+  from forging worker jobs, and explicit reconciliation avoids treating a
+  partially applied mutation as safely retryable.
+- **Rejected:** Giving the gateway a Docker socket, because that is effectively
+  host-root access; unbounded in-process retries, because they can duplicate
+  mutations; and immediately requiring a cloud queue, because it would make
+  local verification depend on paid infrastructure.
+- **Trade-off:** The local mode is not yet a kernel-level process boundary.
+  Dedicated worker deployment and runtime isolation remain required before
+  production traffic.

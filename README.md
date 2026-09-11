@@ -72,7 +72,8 @@ SQLite query runner │ shell executor │ Git workspace
 | A | Documentation and scope expansion | Complete |
 | B | JWT/OIDC foundation, RBAC vocabulary, tenant-aware policy context | Implemented foundation |
 | C | PostgreSQL control-plane persistence and migrations | Implemented foundation |
-| D–F | Workers, evaluation gates, production integrations | Planned |
+| D | Authenticated worker queue, bounded execution, reconciliation | Implemented foundation |
+| E–F | Evaluation gates, production integrations | Planned |
 
 Phase 2 records each call as `received`, `validated`, `policy_checked`,
 `executing`, and a terminal state. It creates a root `tool_call` span plus
@@ -139,8 +140,8 @@ require a real production platform.
    queue.
 4. The repair advisor may propose corrected arguments only for repairable
    failures. The gateway validates and re-evaluates policy before every retry.
-5. An authorized request is submitted to the configured sandbox runner with
-   bounded resources; the dedicated worker protocol is the next stage.
+5. An authorized request is submitted through the configured worker boundary
+   or sandbox runner with bounded resources.
 6. State transitions, traces, approval evidence, attempts, and the outcome are
    persisted. The audit record is hash-chained and replicated in compliance
    mode.
@@ -263,6 +264,20 @@ can run with only the existing Redis state path. Production and staging
 profiles should enable it and run migrations as a release step, never on every
 application start.
 
+To exercise the worker boundary locally, use the queued execution profile:
+
+```bash
+GATEWAY_WORKER_MODE=queued GATEWAY_APPROVAL_TIMEOUT_SECONDS=1 \
+  .venv/bin/python -m eval.client
+```
+
+Jobs are HMAC-authenticated, processed by a bounded worker pool, and deduplicated
+by idempotency key. A stopped worker never causes an uncertain mutation to be
+reported as successful; it creates a `needs_review` reconciliation record.
+The local queued service is an execution-boundary test. Production Kubernetes
+deployments must run the worker as a separate service on dedicated sandbox
+nodes.
+
 To measure model-guided repair, set `GATEWAY_REPAIR_ENABLED=true` and provide
 the OpenAI-compatible endpoint, model, and API key through the ignored `.env`
 file or the process environment. The report records whether malformed cases
@@ -342,6 +357,13 @@ by Git; `.env.example` contains safe defaults.
 | `GATEWAY_CONTROL_PLANE_POOL_SIZE` | `5` | PostgreSQL connection pool size |
 | `GATEWAY_CONTROL_PLANE_MAX_OVERFLOW` | `10` | Additional PostgreSQL connections |
 | `GATEWAY_CONTROL_PLANE_CONNECT_TIMEOUT_SECONDS` | `3.0` | PostgreSQL connection timeout |
+| `GATEWAY_WORKER_MODE` | `in_process` | `in_process` or bounded `queued` execution |
+| `GATEWAY_WORKER_SHARED_SECRET` | unset | HMAC secret for gateway-worker jobs |
+| `GATEWAY_WORKER_MAX_CONCURRENCY` | `4` | Maximum simultaneous worker jobs |
+| `GATEWAY_WORKER_QUEUE_SIZE` | `128` | Maximum queued jobs |
+| `GATEWAY_WORKER_JOB_TIMEOUT_SECONDS` | `120.0` | Gateway wait limit per job |
+| `GATEWAY_WORKER_FAILURE_THRESHOLD` | `3` | Failures before circuit opens |
+| `GATEWAY_WORKER_RESET_TIMEOUT_SECONDS` | `30.0` | Circuit cool-down |
 | `GATEWAY_APPROVAL_TIMEOUT_SECONDS` | `300` | Human approval timeout |
 | `GATEWAY_REPAIR_ENABLED` | `false` | Enable model-guided repair |
 | `GATEWAY_REPAIR_LLM_PROVIDER` | `openai_compatible` | Repair provider |
