@@ -38,6 +38,15 @@ def _write_report(path: Path, report: dict[str, Any]) -> None:
     )
 
 
+def _scenario_passed(scenario: dict[str, Any], observed: str) -> bool:
+    """Classify expected behavior, including successful malformed-call repair."""
+
+    expected = str(scenario.get("expected", "succeeded"))
+    if observed == expected:
+        return True
+    return scenario.get("category") == "malformed" and observed == "succeeded"
+
+
 async def _run_live_scenario(scenario: dict[str, Any], index: int) -> dict[str, Any]:
     """Run one scenario through a fresh production-configured MCP process."""
 
@@ -70,7 +79,7 @@ async def _run_live_scenario(scenario: dict[str, Any], index: int) -> dict[str, 
         "category": str(scenario.get("category", "general")),
         "expected": str(scenario.get("expected", "succeeded")),
         "observed": observed,
-        "passed": observed == str(scenario.get("expected", "succeeded")),
+        "passed": _scenario_passed(scenario, observed),
         "latency_ms": (time.perf_counter() - started) * 1000,
     }
 

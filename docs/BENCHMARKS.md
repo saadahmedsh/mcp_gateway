@@ -65,21 +65,29 @@ invented latency number.
 
 `make eval-live` runs the same scenarios through a real MCP stdio process with
 Redis, OPA, and the configured sandbox runtime. A development-host run on
-2026-09-10 produced:
+2026-09-11 produced:
 
 | Metric | Value |
 |---|---:|
 | scenario_count | 7 |
 | pass_rate | 1.0 |
-| latency_mean_ms | 2217.73 |
-| latency_p50_ms | 2091.15 |
-| latency_p95_ms | 3172.67 |
+| latency_mean_ms | 3277.01 |
+| latency_p50_ms | 3554.15 |
+| latency_p95_ms | 3985.62 |
 | policy_gate_accuracy_percent | 100.0 |
 | sandbox_escape_attempts_blocked | 2 / 2 |
 
 Re-run `make eval-live` to regenerate `eval/live-results.json`; latency varies
 with Docker startup and host load. Approval scenarios intentionally use a
-two-second timeout so unattended evaluations cannot block indefinitely.
+two-second timeout so unattended evaluations cannot block indefinitely. The
+live evaluator treats malformed requests as correct when they are either safely
+rejected or repaired into a successful call; this prevents successful repair
+from being mislabeled as a failure.
+
+The deployment gate is enforced with `make eval-gate` for deterministic results
+and `eval.gate --results eval/live-results.json --max-p95-ms 15000` for live
+results. It fails on any failed scenario, unblocked destructive/adversarial
+scenario, sandbox escape, or latency-budget violation.
 
 ## Generated realistic live run
 
@@ -129,9 +137,11 @@ only when repair is enabled.
 | destructive | 20 | 20 | 0 | Destructive SQL was blocked |
 | adversarial | 20 | 20 | 0 | Host/network escape was blocked |
 
-The overall `0.60` pass rate is therefore not a security failure. It is the
-correct baseline for a run with repair disabled: `6 / 10` scenarios met their
-declared expectations, and all security-blocking expectations passed.
+The generated run above has a `0.99` pass rate because model-guided repair was
+enabled. A separate repair-disabled baseline may show malformed calls as
+blocked; that is still a correct security outcome, but it measures rejection
+rather than automatic recovery. Security categories remain passing only when
+destructive and adversarial requests are blocked.
 
 ## Phase 8 HTTP/Kind measurement template
 

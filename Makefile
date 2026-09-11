@@ -1,7 +1,7 @@
 PYTHON ?= .venv/bin/python
 COMPOSE ?= docker compose
 
-.PHONY: up down test lint demo eval eval-live eval-realistic install sandbox-build db-migrate db-upgrade kind-up kind-load kind-deploy kind-down
+.PHONY: up down test lint demo eval eval-gate eval-live eval-realistic install sandbox-build db-migrate db-upgrade kind-up kind-load kind-deploy kind-down
 
 install:
 	$(PYTHON) -m pip install --requirement requirements.lock
@@ -37,6 +37,9 @@ demo:
 eval:
 	$(PYTHON) -m eval.harness
 	$(PYTHON) -m eval.report
+
+eval-gate: eval
+	$(PYTHON) -m eval.gate --results eval/results.json
 
 eval-live:
 	$(PYTHON) -m eval.live

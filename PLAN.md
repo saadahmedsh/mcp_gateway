@@ -411,13 +411,20 @@ gVisor/Kata `RuntimeClass`; a production runtime adapter must provide the
 actual sandbox capability on dedicated nodes. The gateway never receives a
 Docker socket.
 
-#### Stage E — Evaluation as a deployment gate
+#### Stage E — Evaluation as a deployment gate (implemented foundation)
 
 - Run unit, integration, policy, adversarial, repair, and performance suites in
   CI with reproducible scenario seeds.
 - Fail CI on any security invariant violation, unsafe retry, tenant-isolation
   failure, high-severity image finding, or configured latency/cost regression.
 - Store signed evaluation artifacts alongside the release.
+
+The repository now provides `eval.gate`, which fails closed for failed
+scenarios, successful adversarial/destructive scenarios, and optional live
+latency budgets. `make eval-gate` runs the deterministic suite and validates its
+artifact. CI also runs a live MCP/Redis/OPA/sandbox job, applies a p95 latency
+budget, and uploads both evaluation reports. Signing evaluation artifacts and
+provider-specific cost regression budgets remain deployment hardening work.
 
 #### Stage F — Production service integrations
 

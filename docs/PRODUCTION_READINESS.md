@@ -12,6 +12,7 @@ Review date: 2026-09-10
 | Rego policy tests | Pass | `opa test gateway/policy/policies` — 9/9 |
 | Offline evaluation | Pass | `make eval` — 7/7 scenarios |
 | Live MCP evaluation | Pass | `make eval-live` — 7/7 scenarios |
+| Evaluation release gate | Pass | `make eval-gate` rejects failed/security-unsafe scenarios; CI also gates live p95 latency |
 | Generated realistic benchmark | Pass | `eval.realistic` — seeded 10-scenario local run |
 | Gateway image | Pass | Multi-stage build, non-root user, healthcheck |
 | Helm chart | Pass | `helm lint` and `helm template` |
@@ -46,6 +47,9 @@ These items should be resolved before production traffic is permitted:
 
 - Add image vulnerability scanning, SBOM generation, signature verification, and
   digest-pinned base images.
+- Keep the deterministic and live evaluation gates required in CI, publish
+  signed scenario artifacts, and configure environment-specific latency/cost
+  budgets.
 - Pin GitHub Actions to commit SHAs and add dependency vulnerability checks.
 - Add PodDisruptionBudget, autoscaling, NetworkPolicy, and external secret
   manager integration.

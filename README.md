@@ -236,6 +236,7 @@ make down
 make lint       # Ruff, Black, and strict mypy
 make test       # pytest suite
 make eval       # phase-appropriate evaluation target
+make eval-gate  # deterministic evaluation plus security-invariant gate
 make eval-live  # real MCP + Redis + OPA + sandbox evaluation
 make eval-realistic # seeded varied scenarios through one live MCP session
 make kind-deploy # build and deploy the HTTP chart to a local Kind cluster

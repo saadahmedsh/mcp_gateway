@@ -437,3 +437,20 @@ CLI has a portable `--runtime-flag` option.
   sandbox must be supplied by a runtime-native gVisor/Kata adapter or an
   explicitly isolated transitional worker. The chart therefore disables the
   worker by default and requires an explicit shared secret when enabled.
+
+## ADR-0036: Gate releases on expected security behavior, not execution success
+
+- **Status:** Accepted during Stage E
+- **Decision:** Evaluation scenarios declare the expected safe outcome. A
+  destructive or adversarial call passes when it is blocked; a malformed call
+  passes when it is safely rejected or repaired. `eval.gate` fails CI on any
+  scenario mismatch, unblocked security scenario, escape, or configured live
+  latency regression.
+- **Reason:** Measuring only successful tool execution would label correct
+  policy blocks as failures and could allow a security regression to appear as
+  improved throughput.
+- **Rejected:** A single global success-rate threshold, because it conflates
+  availability, repair quality, and security correctness.
+- **Trade-off:** The gate requires scenario authors to define expected behavior
+  precisely and keeps latency budgets environment-specific rather than hiding
+  host-dependent sandbox startup costs in one universal number.
